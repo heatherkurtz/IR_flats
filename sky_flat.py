@@ -222,6 +222,15 @@ def main():
 		print(f)
 		hdr1 = fits.getheader(f, 0)
 		propid=hdr1['PROPOSID']
+		calver=hdr1['CAL_VER']
+		targ=hdr1['TARGNAME']
+		expt=hdr1['EXPTIME']
+		FILTER=hdr1['FILTER']
+		logger.info('PROPOSID: %s', propid)
+		logger.info('CAL_VER: %s',calver)
+		logger.info('TARGNAME: %s',targ)
+		logger.info('EXPTIME: %s',expt)
+		logger.info('FILTER: %s',FILTER)
 		data,dq=get_data(f)
 		data_mask=np.copy(data)
 		data_mask[dq!=0]=0
@@ -240,19 +249,20 @@ def main():
 		im=mask_sources(dataC)
 		dq_mask(dq,data,im)
 		image,norm_mean=normalize(data)
+		logger.info('Normalized to: %s', norm_mean)
 		clipdata=sigclip(image)
 		nan_siz,dat_siz=data_size(clipdata)
 		hdr1['NORM']=norm_mean
-		logger.info(nan_siz)
+		logger.info('Number of nan pixel: %s', nan_siz)
 		if nan_siz>(dat_siz*0.8):
 			list_bad.append(f)
-			logger.info('File has too many masked pixles. Not used.')
+			logger.info('File has too many masked pixels. Not used.')
 			#continue
 		else:
 			mean=np.nanmean(image)
 			median=np.nanmedian(image)
 			diff=mean-median
-			logger.info(diff)
+			logger.info('Differance Mean-Median: %s',diff)
 			if abs(diff)>1.0:
 				list_lim.append(f)
 				logger.info('File has Earthlim. Not used.')
