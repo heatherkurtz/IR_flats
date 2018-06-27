@@ -113,7 +113,16 @@ def convolv_data(seg_arr):
 
 def wrtie_file(file,hdr,plo,pro):
 	spro=str(pro)
-	file_name=spro+file[-18:-8]+'mdi.fits'
+	file_name='/user/hkurtz/IR_flats/test_run/'+spro+file[-18:-8]+'mdi.fits'
+	prihdu=fits.PrimaryHDU(header=hdr)
+	single_extension1=fits.ImageHDU(data=plo.astype(np.float32))
+	all_extensions=[prihdu,single_extension1]
+	myhdulist=fits.HDUList(all_extensions)
+	myhdulist.writeto(file_name, overwrite=True)
+
+def wrtie_seg(file,hdr,plo,pro):
+	spro=str(pro)
+	file_name='/user/hkurtz/IR_flats/test_run/'+spro+file[-18:-8]+'seg.fits'
 	prihdu=fits.PrimaryHDU(header=hdr)
 	single_extension1=fits.ImageHDU(data=plo.astype(np.float32))
 	all_extensions=[prihdu,single_extension1]
@@ -197,10 +206,10 @@ def main():
 	logger.info('The pipeline is starting')
 
 
-	pro_list=['12167']
-	#pro_list=['11108','11142','11149','11153','11166','11189','11202','11208','11343','11359',
-	#			'11519','11520','11534','11541','11557','11563','11584','11597','11600','11644',
-	#			'11650','11666','11669','11694','11700','11702','11735','11838','11840','11587']
+	#pro_list=['12167']
+	pro_list=['11108','11142','11149','11153','11166','11189','11202','11208','11343','11359',
+				'11519','11520','11534','11541','11557','11563','11584','11597','11600','11644',
+				'11650','11666','11669','11694','11700','11702','11735','11838','11840','11587']
 	list_files=[]
 	for i in range(len(pro_list)):
 		logger.info('Getting the data for QL')
@@ -245,6 +254,7 @@ def main():
 
 		seg=segm.array
 		seg[seg>0]=1.0
+		wrtie_seg(f,hdr1,seg,propid)
 		dataC=convolv_data(seg)
 		im=mask_sources(dataC)
 		dq_mask(dq,data,im)
@@ -254,6 +264,7 @@ def main():
 		nan_siz,dat_siz=data_size(clipdata)
 		hdr1['NORM']=norm_mean
 		logger.info('Number of nan pixel: %s', nan_siz)
+		wrtie_file(f,hdr1,image,propid)
 		if nan_siz>(dat_siz*0.8):
 			list_bad.append(f)
 			logger.info('File has too many masked pixels. Not used.')
@@ -274,10 +285,10 @@ def main():
 	print('good',len(list_good))
 	print('bad',len(list_bad))
 	print('lim',len(list_lim))
-	#S_mean,S_median,S_sum,S_std=Stack(data_array)
+	S_mean,S_median,S_sum,S_std=Stack(data_array)
 
-	#fits.writeto('test_F160_10_mean_sn5.fits', S_mean,overwrite=True)
-	#fits.writeto('test_F160_10_median_sn5.fits', S_median,overwrite=True)
+	fits.writeto('F160_mean_test.fits', S_mean,overwrite=True)
+	fits.writeto('F160_median_test.fits', S_median,overwrite=True)
 
 
 
