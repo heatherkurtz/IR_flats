@@ -113,7 +113,17 @@ def convolv_data(seg_arr):
 
 def wrtie_file(file,hdr,plo,pro):
 	spro=str(pro)
-	file_name=spro+file[-18:-8]+'mdi.fits'
+	file_name='/user/hkurtz/IR_flats/multi_test_run/'+spro+file[-18:-8]+'mdi.fits'
+	prihdu=fits.PrimaryHDU(header=hdr)
+	single_extension1=fits.ImageHDU(data=plo.astype(np.float32))
+	all_extensions=[prihdu,single_extension1]
+	myhdulist=fits.HDUList(all_extensions)
+	myhdulist.writeto(file_name, overwrite=True)
+
+
+def wrtie_seg(file,hdr,plo,pro):
+	spro=str(pro)
+	file_name='/user/hkurtz/IR_flats/multi_test_run/'+spro+file[-18:-8]+'seg.fits'
 	prihdu=fits.PrimaryHDU(header=hdr)
 	single_extension1=fits.ImageHDU(data=plo.astype(np.float32))
 	all_extensions=[prihdu,single_extension1]
@@ -158,6 +168,70 @@ def data_size(data):
 	return(nan_size,datsize)
 
 
+def testing(f):
+	logger = logging.getLogger('f160w')
+	hdlr = logging.FileHandler('/user/hkurtz/IR_flats/f160w.log')
+	formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+	hdlr.setFormatter(formatter)
+	logger.addHandler(hdlr) 
+	logger.setLevel(logging.INFO)
+
+	logger.info(f)
+	print(f)
+	hdr1 = fits.getheader(f, 0)
+	propid=hdr1['PROPOSID']
+	calver=hdr1['CAL_VER']
+	targ=hdr1['TARGNAME']
+	expt=hdr1['EXPTIME']
+	FILTER=hdr1['FILTER']
+	logger.info('PROPOSID: %s', propid)
+	logger.info('CAL_VER: %s',calver)
+	logger.info('TARGNAME: %s',targ)
+	logger.info('EXPTIME: %s',expt)
+	logger.info('FILTER: %s',FILTER)
+	data,dq=get_data(f)
+	data_mask=np.copy(data)
+	data_mask[dq!=0]=0
+	#fig, (ax1) = plt.subplots(1, 1, figsize=(5, 5))
+	#ax1.imshow(data_mask, origin='lower')
+	#print('data',data[200:210,200:210])
+	#print('data masked',data_mask[200:210,200:210])
+	segm=find_sources(data_mask)
+	#fig, (ax1) = plt.subplots(1, 1, figsize=(5, 5))
+	#ax1.imshow(segm, origin='lower',cmap=segm.cmap(random_state=12345))
+	#plt.show()
+
+	seg=segm.array
+	seg[seg>0]=1.0
+	wrtie_seg(f,hdr1,seg,propid)
+	dataC=convolv_data(seg)
+	im=mask_sources(dataC)
+	dq_mask(dq,data,im)
+	image,norm_mean=normalize(data)
+	logger.info('Normalized to: %s', norm_mean)
+	clipdata=sigclip(image)
+	nan_siz,dat_siz=data_size(clipdata)
+	hdr1['NORM']=norm_mean
+	logger.info('Number of nan pixel: %s', nan_siz)
+	if nan_siz>(dat_siz*0.8):
+		#list_bad.append(f)
+		logger.info('File has too many masked pixels. Not used.')
+		#continue
+	else:
+		mean=np.nanmean(image)
+		median=np.nanmedian(image)
+		diff=mean-median
+		logger.info('Differance Mean-Median: %s',diff)
+		if abs(diff)>1.0:
+			#list_lim.append(f)
+			logger.info('File has Earthlim. Not used.')
+		else:
+			wrtie_file(f,hdr1,image,propid)
+			#data_array[i, :, :] = clipdata
+			#list_good.append(f)
+			logger.info('File Used.')
+
+
 #def sub_check(data):
 #	ys,xs = np.shape(data)           
 #	if ys!=1014 or xs!=1014:
@@ -186,8 +260,8 @@ def main():
 
 	#list_file=glob.glob('/grp/hst/wfc3a/GO_Links/12167/Visit05/*flt.fits')
 
-	logger = logging.getLogger('myapp')
-	hdlr = logging.FileHandler('/user/hkurtz/IR_flats/myapp.log')
+	logger = logging.getLogger('f160w')
+	hdlr = logging.FileHandler('/user/hkurtz/IR_flats/f160w.log')
 	formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
 	hdlr.setFormatter(formatter)
 	logger.addHandler(hdlr) 
@@ -197,10 +271,10 @@ def main():
 	logger.info('The pipeline is starting')
 
 
-	pro_list=['12167']
-	#pro_list=['11108','11142','11149','11153','11166','11189','11202','11208','11343','11359',
-	#			'11519','11520','11534','11541','11557','11563','11584','11597','11600','11644',
-	#			'11650','11666','11669','11694','11700','11702','11735','11838','11840','11587']
+	#pro_list=['12167']
+	pro_list=['11108','11142','11149','11153','11166','11189','11202','11208','11343','11359',
+				'11519','11520','11534','11541','11557','11563','11584','11597','11600','11644',
+				'11650','11666','11669','11694','11700','11702','11735','11838','11840','11587']
 	list_files=[]
 	for i in range(len(pro_list)):
 		logger.info('Getting the data for QL')
@@ -213,67 +287,70 @@ def main():
 	ny = hdr['NAXIS2']
 	nf = len(list_files)
 	set_data=fits.getdata(list_files[0], 1)
-	data_array = np.empty((nf, ny, nx), dtype=float)
+	#data_array = np.empty((nf, ny, nx), dtype=float)
 	list_bad=[]
 	list_good=[]
 	list_lim=[]
-	for i , f in enumerate(list_files):
-		logger.info(f)
-		print(f)
-		hdr1 = fits.getheader(f, 0)
-		propid=hdr1['PROPOSID']
-		calver=hdr1['CAL_VER']
-		targ=hdr1['TARGNAME']
-		expt=hdr1['EXPTIME']
-		FILTER=hdr1['FILTER']
-		logger.info('PROPOSID: %s', propid)
-		logger.info('CAL_VER: %s',calver)
-		logger.info('TARGNAME: %s',targ)
-		logger.info('EXPTIME: %s',expt)
-		logger.info('FILTER: %s',FILTER)
-		data,dq=get_data(f)
-		data_mask=np.copy(data)
-		data_mask[dq!=0]=0
-		#fig, (ax1) = plt.subplots(1, 1, figsize=(5, 5))
-		#ax1.imshow(data_mask, origin='lower')
-		#print('data',data[200:210,200:210])
-		#print('data masked',data_mask[200:210,200:210])
-		segm=find_sources(data_mask)
-		#fig, (ax1) = plt.subplots(1, 1, figsize=(5, 5))
-		#ax1.imshow(segm, origin='lower',cmap=segm.cmap(random_state=12345))
-		#plt.show()
-
-		seg=segm.array
-		seg[seg>0]=1.0
-		dataC=convolv_data(seg)
-		im=mask_sources(dataC)
-		dq_mask(dq,data,im)
-		image,norm_mean=normalize(data)
-		logger.info('Normalized to: %s', norm_mean)
-		clipdata=sigclip(image)
-		nan_siz,dat_siz=data_size(clipdata)
-		hdr1['NORM']=norm_mean
-		logger.info('Number of nan pixel: %s', nan_siz)
-		if nan_siz>(dat_siz*0.8):
-			list_bad.append(f)
-			logger.info('File has too many masked pixels. Not used.')
-			#continue
-		else:
-			mean=np.nanmean(image)
-			median=np.nanmedian(image)
-			diff=mean-median
-			logger.info('Differance Mean-Median: %s',diff)
-			if abs(diff)>1.0:
-				list_lim.append(f)
-				logger.info('File has Earthlim. Not used.')
-			else:
-				#wrtie_file(f,hdr1,image,propid)
-				data_array[i, :, :] = clipdata
-				list_good.append(f)
-				logger.info('File Used.')
-	print('good',len(list_good))
-	print('bad',len(list_bad))
-	print('lim',len(list_lim))
+	p = Pool(8)
+	result=p.map(testing,list_files)
+	print(result)
+	#for i , f in enumerate(list_files):
+#		logger.info(f)
+#		print(f)
+#		hdr1 = fits.getheader(f, 0)
+#		propid=hdr1['PROPOSID']
+#		calver=hdr1['CAL_VER']
+#		targ=hdr1['TARGNAME']
+#		expt=hdr1['EXPTIME']
+#		FILTER=hdr1['FILTER']
+#		logger.info('PROPOSID: %s', propid)
+#		logger.info('CAL_VER: %s',calver)
+#		logger.info('TARGNAME: %s',targ)
+#		logger.info('EXPTIME: %s',expt)
+#		logger.info('FILTER: %s',FILTER)
+#		data,dq=get_data(f)
+#		data_mask=np.copy(data)
+#		data_mask[dq!=0]=0
+#		#fig, (ax1) = plt.subplots(1, 1, figsize=(5, 5))
+#		#ax1.imshow(data_mask, origin='lower')
+#		#print('data',data[200:210,200:210])
+#		#print('data masked',data_mask[200:210,200:210])
+#		segm=find_sources(data_mask)
+#		#fig, (ax1) = plt.subplots(1, 1, figsize=(5, 5))
+#		#ax1.imshow(segm, origin='lower',cmap=segm.cmap(random_state=12345))
+#		#plt.show()
+#
+#		seg=segm.array
+#		seg[seg>0]=1.0
+#		dataC=convolv_data(seg)
+#		im=mask_sources(dataC)
+#		dq_mask(dq,data,im)
+#		image,norm_mean=normalize(data)
+#		logger.info('Normalized to: %s', norm_mean)
+#		clipdata=sigclip(image)
+#		nan_siz,dat_siz=data_size(clipdata)
+#		hdr1['NORM']=norm_mean
+#		logger.info('Number of nan pixel: %s', nan_siz)
+#		if nan_siz>(dat_siz*0.8):
+#			list_bad.append(f)
+#			logger.info('File has too many masked pixels. Not used.')
+#			#continue
+#		else:
+#			mean=np.nanmean(image)
+#			median=np.nanmedian(image)
+#			diff=mean-median
+#			logger.info('Differance Mean-Median: %s',diff)
+#			if abs(diff)>1.0:
+#				list_lim.append(f)
+#				logger.info('File has Earthlim. Not used.')
+#			else:
+#				#wrtie_file(f,hdr1,image,propid)
+#				#data_array[i, :, :] = clipdata
+#				list_good.append(f)
+#				logger.info('File Used.')
+	#print('good',len(list_good))
+	#print('bad',len(list_bad))
+	#print('lim',len(list_lim))
 	#S_mean,S_median,S_sum,S_std=Stack(data_array)
 
 	#fits.writeto('test_F160_10_mean_sn5.fits', S_mean,overwrite=True)
