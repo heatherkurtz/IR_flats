@@ -272,9 +272,9 @@ def main():
 		else:
 			mean=np.nanmean(image)
 			median=np.nanmedian(image)
-			diff=mean-median
-			logger.info('Differance Mean-Median: %s',diff)
-			if abs(diff)>1.0:
+			diff=mean/median
+			logger.info('Ratio Mean/Median: %s',diff)
+			if abs(diff)>1.0025:
 				list_lim.append(f)
 				logger.info('File has Earthlim. Not used.')
 			else:
