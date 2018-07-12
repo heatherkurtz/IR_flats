@@ -169,8 +169,8 @@ def data_size(data):
 
 
 def testing(f):
-	logger = logging.getLogger('f160w')
-	hdlr = logging.FileHandler('/user/hkurtz/IR_flats/f160w.log')
+	logger = logging.getLogger('ftestw')
+	hdlr = logging.FileHandler('/user/hkurtz/IR_flats/testing.log')
 	formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
 	hdlr.setFormatter(formatter)
 	logger.addHandler(hdlr) 
@@ -184,9 +184,10 @@ def testing(f):
 	targ=hdr1['TARGNAME']
 	expt=hdr1['EXPTIME']
 	FILTER=hdr1['FILTER']
-	logger.info('PROPOSID: %s', propid)
-	logger.info('CAL_VER: %s',calver)
-	logger.info('TARGNAME: %s',targ)
+
+	logger.info('[PROPOSID:, CAL_VER:, TARGNAME:] %s', [propid,calver,targ])
+	#logger.info('CAL_VER: %s',calver)
+	#logger.info('TARGNAME: %s',targ)
 	logger.info('EXPTIME: %s',expt)
 	logger.info('FILTER: %s',FILTER)
 	data,dq=get_data(f)
@@ -201,7 +202,7 @@ def testing(f):
 	#ax1.imshow(segm, origin='lower',cmap=segm.cmap(random_state=12345))
 	#plt.show()
 
-	seg=segm.array
+	seg=segm.array #add to find source function for the next 2 lines
 	seg[seg>0]=1.0
 	wrtie_seg(f,hdr1,seg,propid)
 	dataC=convolv_data(seg)
@@ -212,7 +213,7 @@ def testing(f):
 	clipdata=sigclip(image)
 	nan_siz,dat_siz=data_size(clipdata)
 	hdr1['NORM']=norm_mean
-	logger.info('Number of nan pixel: %s', nan_siz)
+	logger.info('Percent nan pixel: %s', (nan_siz/dat_siz))
 	if nan_siz>(dat_siz*0.8):
 		#list_bad.append(f)
 		logger.info('File has too many masked pixels. Not used.')
@@ -230,6 +231,8 @@ def testing(f):
 			#data_array[i, :, :] = clipdata
 			#list_good.append(f)
 			logger.info('File Used.')
+#move if statments as conditionals
+
 
 
 #def sub_check(data):
@@ -271,10 +274,10 @@ def main():
 	logger.info('The pipeline is starting')
 
 
-	#pro_list=['12167']
-	pro_list=['11108','11142','11149','11153','11166','11189','11202','11208','11343','11359',
-				'11519','11520','11534','11541','11557','11563','11584','11597','11600','11644',
-				'11650','11666','11669','11694','11700','11702','11735','11838','11840','11587']
+	pro_list=['12167']
+	#pro_list=['11108','11142','11149','11153','11166','11189','11202','11208','11343','11359',
+	#			'11519','11520','11534','11541','11557','11563','11584','11597','11600','11644',
+	#			'11650','11666','11669','11694','11700','11702','11735','11838','11840','11587']
 	list_files=[]
 	for i in range(len(pro_list)):
 		logger.info('Getting the data for QL')
