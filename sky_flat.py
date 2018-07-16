@@ -15,13 +15,15 @@ import multiprocessing
 from multiprocessing import Pool
 import os
 import sys
+from typing import Tuple
 
 from astropy.convolution import Gaussian2DKernel
 from astropy.io import fits
 from astropy.stats import gaussian_fwhm_to_sigma
 from astropy.convolution import convolve
 from astropy.stats import sigma_clip
-
+from numpy.core.multiarray import ndarray
+from scipy import stats
 # from mx import DateTime
 import numpy as np
 from photutils import DAOStarFinder
@@ -91,8 +93,8 @@ def find_sources(data):
     return (segm)
 
 
-def persistince_masks(data,per):
-    data[per > 0.003] = np.nan
+def persistince_masks(data, per):
+    data[per > 0.005] = np.nan
     return data
 
 
@@ -165,6 +167,13 @@ def data_size(data):
     nans = data[np.isnan(data)]
     nan_size = len(nans)
     return (nan_size, datsize)
+
+
+def earth_lim_check(image):
+    mode = stats.mode(~np.isnan(image))
+    #mean = np.nanmean(image)
+    median = np.nanmedian(image)
+    diff = (median - mode)/median
 
 
 def testing(f):
@@ -272,17 +281,17 @@ def main():
     # logger = logging.getLogger(__name__)
     logger.info('The pipeline is starting')
 
-    #pro_list = ['11702']
-    pro_list=['11108','11142','11149','11153','11166','11189','11202','11208','11343','11359',
-    			'11519','11520','11534','11541','11557','11563','11584','11597','11600','11644',
-    			'11650','11666','11669','11694','11700','11702','11735','11838','11840','11587']
+    # pro_list = ['11702']
+    pro_list = ['11108', '11142', '11149', '11153', '11166', '11189', '11202', '11208', '11343', '11359',
+                '11519', '11520', '11534', '11541', '11557', '11563', '11584', '11597', '11600', '11644',
+                '11650', '11666', '11669', '11694', '11700', '11702', '11735', '11838', '11840', '11587']
     list_files = []
     for i in range(len(pro_list)):
         logger.info('Getting the data for QL')
         list_file = quary_ql(pro_list[i], 'F098M')
         for j in range(len(list_file)):
             list_files.append(list_file[j])
-        #print(len(list_files))
+        # print(len(list_files))
     # list_file=quary_ql('12025','F160W')
     hdr = fits.getheader(list_files[0], 1)
     nx = hdr['NAXIS1']
