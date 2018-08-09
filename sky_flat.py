@@ -36,6 +36,10 @@ hdlr.setFormatter(formatter)
 logger.addHandler(hdlr)                                                 
 logger.setLevel(logging.INFO)
 
+# TODO Create diagnostic plots for each FLT frame with a histogram of pixel values after masking. Overplot  sigma-clipped mean and (sigma-clipped)
+# TODO median. We can look at these later and decide which typically works better.
+# TODO made dic to creat doc with /QL_path/file_flt.fits, filter, exptime, mean, median, mode, %Good_pix, (mean/med), (med-mode)/med,  Used?(y/n)
+
 
 def quary_ql(proid, filt):
     # I need to use the ql quary to get: directories for images,
@@ -115,17 +119,7 @@ def write_file(file, hdr, plo, pro, end):
     myhdulist.writeto(file_name, overwrite=True)
 
 
-#def write_seg(file, hdr, plo, pro):
-#    spro = str(pro)
-#    file_name = '/user/hkurtz/IR_flats/test_f098/' + spro + file[-18:-8] + 'seg.fits'
-#    prihdu = fits.PrimaryHDU(header=hdr)
-#    single_extension1 = fits.ImageHDU(data=plo.astype(np.float32))
-#    all_extensions = [prihdu, single_extension1]
-#    myhdulist = fits.HDUList(all_extensions)
-#    myhdulist.writeto(file_name, overwrite=True)
-
-
-def normalize(data):  # use region [101:900,101:900]
+def normalize(data):
     values = data[~np.isnan(data)]
     values, clow, chigh = sigmaclip(values, low=3, high=3)
     mean = np.mean(values)
@@ -168,6 +162,7 @@ def earth_lim_check(image):
     #mean = np.nanmean(image)
     median = np.nanmedian(image)
     diff = (median - mode)/median
+    return(diff,mode)
 
 
 def get_header_data(f):
@@ -184,13 +179,23 @@ def get_header_data(f):
     logger.info('EXPTIME: %s', expt)
     logger.info('FILTER: %s', FILTER)
 
+
+def add_to_header(hdr,norm_mean, mean, median, mode, good_pix, used):
+    hdr['NORM'] = norm_mean
+    hdr['Mean'] = mean
+    hdr['Median'] = median
+    hdr['Mode'] = mode
+    hdr['PerGood'] = good_pix
+    hdr['Used'] = used
+
+
 def testing(f):
-    logger = multiprocessing.get_logger()
-    hdlr = logging.FileHandler('/user/hkurtz/IR_flats/098.log')
-    formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-    hdlr.setFormatter(formatter)
-    logger.addHandler(hdlr)
-    logger.setLevel(logging.INFO)
+    #logger = multiprocessing.get_logger()
+    #hdlr = logging.FileHandler('/user/hkurtz/IR_flats/098.log')
+    #formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+    #hdlr.setFormatter(formatter)
+    #logger.addHandler(hdlr)
+    #logger.setLevel(logging.INFO)
 
     logger.info(f)
     print(f)
@@ -214,30 +219,34 @@ def testing(f):
     dataC = convolve_data(seg)
     im = mask_sources(dataC)
     dq_mask(dq, data, im)
-    image, norm_mean = normalize(data)
+    image, norm_mean = normalize_region(data)
     logger.info('Normalized to: %s', norm_mean)
     clipdata = sigclip(image)
     nan_siz, dat_siz = data_size(clipdata)
     hdr1['NORM'] = norm_mean
+    per = (nan_siz / dat_siz)*100
     logger.info('Percent nan pixel: %s', (nan_siz / dat_siz))
-    if nan_siz > (dat_siz * 0.8):
+    if nan_siz > (dat_siz * 0.75):
         # list_bad.append(f)
         logger.info('File has too many masked pixels. Not used.')
     # continue
     else:
         mean = np.nanmean(image)
         median = np.nanmedian(image)
-        diff = mean - median
+        diff,mode = earth_lim_check(image)
         logger.info('Differance Mean-Median: %s', diff)
-        if abs(diff) > 1.0:
+        if abs(diff) > 1.0011:
             # list_lim.append(f)
             logger.info('File has Earthlim. Not used.')
         else:
+            used = 'yes'
+
+            add_to_header(hdr1,norm_mean, mean, median, mode, per, used)
             write_file(f, hdr1, image, propid, 'mdi.fits')
             # data_array[i, :, :] = clipdata
             # list_good.append(f)
             logger.info('File Used.')
-
+    return()
 
 # move if statments as conditionals
 
@@ -250,39 +259,24 @@ def testing(f):
 
 
 def main():
-    # quarry ql put values into dictionary
-    # put into forloop for filters
-
-    # for i in len(dic[rootnames]):
-    #	direct=dic[dir(i)]
-
-    # open file
-
-    # test file to see it good to use
-
-    #	if quality =='good':
-    # do everything else (find source, mask source normalize, and save)
-    #	if qality=='bad':
-    #		continue
-
-    # test data:
-
     # list_file=glob.glob('/grp/hst/wfc3a/GO_Links/12167/Visit05/*flt.fits')
 
-    logger = logging.getLogger('f098')
-    hdlr = logging.FileHandler('/user/hkurtz/IR_flats/f098.log')
-    formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-    hdlr.setFormatter(formatter)
-    logger.addHandler(hdlr)
-    logger.setLevel(logging.INFO)
+    #logger = logging.getLogger('f098')
+    #hdlr = logging.FileHandler('/user/hkurtz/IR_flats/f098.log')
+    #formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+    #hdlr.setFormatter(formatter)
+    #logger.addHandler(hdlr)
+    #logger.setLevel(logging.INFO)
     # logging.basicConfig(level=logging.INFO)
     # logger = logging.getLogger(__name__)
     logger.info('The pipeline is starting')
 
-    # pro_list = ['11702']
-    pro_list = ['11108', '11142', '11149', '11153', '11166', '11189', '11202', '11208', '11343', '11359',
-                '11519', '11520', '11534', '11541', '11557', '11563', '11584', '11597', '11600', '11644',
-                '11650', '11666', '11669', '11694', '11700', '11702', '11735', '11838', '11840', '11587']
+    dict={}
+
+    pro_list = ['11702']
+    #pro_list = ['11108', '11142', '11149', '11153', '11166', '11189', '11202', '11208', '11343', '11359',
+     #           '11519', '11520', '11534', '11541', '11557', '11563', '11584', '11597', '11600', '11644',
+      #          '11650', '11666', '11669', '11694', '11700', '11702', '11735', '11838', '11840', '11587']
     list_files = []
     for i in range(len(pro_list)):
         logger.info('Getting the data for QL')
@@ -300,6 +294,7 @@ def main():
     list_bad = []
     list_good = []
     list_lim = []
+    dict={}
     p = Pool(8)
     result = p.map(testing, list_files)
     print(result)
