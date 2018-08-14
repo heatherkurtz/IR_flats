@@ -29,8 +29,8 @@ from scipy import stats
 from scipy.stats import sigmaclip
 
 # global variables: ie. logger
-logger = logging.getLogger('f098m')
-hdlr = logging.FileHandler('/user/hkurtz/IR_flats/098.log')
+logger = logging.getLogger('test')
+hdlr = logging.FileHandler('/user/hkurtz/IR_flats/test.log')
 formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
 hdlr.setFormatter(formatter)
 logger.addHandler(hdlr)                                                 
@@ -60,9 +60,14 @@ def quary_ql(proid, filt):
     return locales
 
 
-def get_data(file):
+def open_file(file):
     hdulist = fits.open(file)
     data = hdulist[1].data
+    return data
+
+
+def get_data(file):
+    data = open_file(file)
     # masked_data=hdulist[1].data
     dq = hdulist[3].data
     hdulist.close()
@@ -91,9 +96,15 @@ def find_sources(data):
     return seg
 
 
-def persistince_masks(data, per):
-    data[per > 0.005] = np.nan
-    return data
+def persistince_source(file):
+    p_file=file[:-19]+'Persist/'+file[-19:-9]+'persist.fits'
+    hdulist = fits.open(p_file)
+    p_data = hdulist[1].data
+    return p_data
+
+
+def persistince_masks(data, percist):
+    data[percist > 0.005] = np.nan
 
 
 def mask_sources(seg):
@@ -148,6 +159,16 @@ def sigclip(data):
     # sigmaclip the data
     clip_data = sigma_clip(data, sigma=2, iters=3)
     return clip_data
+
+def flat_field(data):
+    n_file = iref$sca2026 * pfl.fits
+    o_file = iref$uc7211 * pfl.fits
+    o_flat = open_file(o_file)
+    n_flat = open_file(n_file)
+    o_data=o_flat[6:1019,6:1019]
+    n_data=n_flat[6:1019,6:1019]
+    new_data=data*(o_data/n_data)
+    return new_data
 
 
 def data_size(data):
@@ -212,6 +233,7 @@ def testing(f):
     logger.info('EXPTIME: %s', expt)
     logger.info('FILTER: %s', filter)
     data, dq = get_data(f)
+    p_data = persistince_source(f)
     data_mask = np.copy(data)
     data_mask[dq != 0] = 0
     seg = find_sources(data_mask)
@@ -219,6 +241,7 @@ def testing(f):
     dataC = convolve_data(seg)
     im = mask_sources(dataC)
     dq_mask(dq, data, im)
+    persistince_masks(data, p_data)
     image, norm_mean = normalize_region(data)
     logger.info('Normalized to: %s', norm_mean)
     clipdata = sigclip(image)
