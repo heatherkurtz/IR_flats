@@ -10,7 +10,6 @@ Use
 """
 
 import logging
-import multiprocessing
 import os
 from multiprocessing import Pool
 
@@ -37,14 +36,16 @@ hdlr.setFormatter(formatter)
 logger.addHandler(hdlr)                                                 
 logger.setLevel(logging.INFO)
 
-filt_table = ascii.read('filter_info', data_start=1 , delimiter=' ')
+filt_table = ascii.read('filter_info', data_start=1, delimiter=' ')
 filt_list = filt_table['FILTER']
 pflat_list = filt_table['TV3']
 lflat_list = filt_table['Pipeline']
 
-# TODO Create diagnostic plots for each FLT frame with a histogram of pixel values after masking. Overplot  sigma-clipped mean and (sigma-clipped)
+# TODO Create diagnostic plots for each FLT frame with a histogram of pixel values after masking. Overplot
+# sigma-clipped mean and (sigma-clipped)
 # TODO median. We can look at these later and decide which typically works better.
-# TODO made dic to creat doc with /QL_path/file_flt.fits, filter, exptime, mean, median, mode, %Good_pix, (mean/med), (med-mode)/med,  Used?(y/n)
+# TODO made dic to creat doc with /QL_path/file_flt.fits, filter, exptime, mean, median, mode, %Good_pix,
+# (mean/med), (med-mode)/med,  Used?(y/n)
 
 
 def quary_ql(proid, filt):
@@ -73,8 +74,9 @@ def open_file(file):
 
 
 def get_data(file):
-    data = open_file(file)
+    hdulist = fits.open(file)
     # masked_data=hdulist[1].data
+    data = hdulist[1].data
     dq = hdulist[3].data
     hdulist.close()
     return data, dq
@@ -83,7 +85,7 @@ def get_data(file):
 def dq_mask(dq, data, ims):
     bit_mask = (4 + 16 + 32 + 128 + 512)
     dq0 = np.bitwise_and(dq, np.zeros(np.shape(dq), 'Int16') + bit_mask)
-    dq0 == 0
+    #dq0 == 0
     dq0[dq0 > 0] = 1
     # data[dq!=0]=np.nan
     ims[dq0 > 0] = 1
@@ -103,9 +105,13 @@ def find_sources(data):
 
 
 def persistince_source(file):
-    p_file=file[:-19]+'Persist/'+file[-19:-9]+'persist.fits'
-    hdulist = fits.open(p_file)
-    p_data = hdulist[1].data
+    try:
+        p_file = file[:-19] + '/Persist' + file[-19:-9] + '_persist.fits'
+        hdulist = fits.open(p_file)
+        p_data = hdulist[1].data
+    except FileNotFoundError:
+        p_data=np.zeros((1014, 1014))
+
     return p_data
 
 
@@ -126,9 +132,9 @@ def convolve_data(seg_arr):
     return dataC
 
 
-def write_file(file, hdr, plo, pro, end):
+def write_file(file, hdr, plo, pro, end, filt):
     spro = str(pro)
-    file_name = '/user/hkurtz/IR_flats/test_f098/' + spro + file[-18:-8] + end
+    file_name = '/grp/hst/wfc3v/hkurtz/sky_flats/' + filt + '/' + spro + file[-18:-8] + end
     prihdu = fits.PrimaryHDU(header=hdr)
     single_extension1 = fits.ImageHDU(data=plo.astype(np.float32))
     all_extensions = [prihdu, single_extension1]
@@ -166,9 +172,10 @@ def sigclip(data):
     clip_data = sigma_clip(data, sigma=2, iters=3)
     return clip_data
 
-def flat_field(data, filter, list_filt, tv3, pipeline):
-    for i in list_filt:
-        if list_filt[i] == filter:
+
+def flat_field(data, filt, list_filt, tv3, pipeline):
+    for i in range(len(list_filt)):
+        if list_filt[i] == filt:
             pflat = tv3[i]
             lflat = pipeline[i]
         else:
@@ -177,9 +184,9 @@ def flat_field(data, filter, list_filt, tv3, pipeline):
     o_file = '/grp/hst/cdbs/iref/' + lflat
     o_flat = open_file(o_file)
     n_flat = open_file(n_file)
-    o_data=o_flat[6:1019,6:1019]
-    n_data=n_flat[6:1019,6:1019]
-    new_data=data*(o_data/n_data)
+    o_data = o_flat[5:1019, 5:1019]
+    n_data = n_flat[5:1019, 5:1019]
+    new_data = data * (o_data/n_data)
     return new_data
 
 
@@ -250,7 +257,7 @@ def testing(f):
     data_mask = np.copy(data)
     data_mask[dq != 0] = 0
     seg = find_sources(data_mask)
-    write_file(f, hdr1, seg, propid, 'seg.fits')
+    write_file(f, hdr1, seg, propid, 'seg.fits', filter)
     dataC = convolve_data(seg)
     im = mask_sources(dataC)
     dq_mask(dq, data, im)
@@ -277,8 +284,8 @@ def testing(f):
         else:
             used = 'yes'
 
-            add_to_header(hdr1,norm_mean, mean, median, mode, per, used)
-            write_file(f, hdr1, image, propid, 'mdi.fits')
+            add_to_header(hdr1, norm_mean, mean, median, mode, per, used)
+            write_file(f, hdr1, image, propid, 'mdi.fits', filter)
             # data_array[i, :, :] = clipdata
             # list_good.append(f)
             logger.info('File Used.')
