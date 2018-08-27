@@ -20,6 +20,7 @@ from astropy.convolution import convolve
 from astropy.io import fits
 from astropy.stats import gaussian_fwhm_to_sigma
 from astropy.stats import sigma_clip
+from astropy.io import ascii
 from photutils import detect_sources
 from photutils import detect_threshold
 from pyql.database.ql_database_interface import IR_flt_0
@@ -35,6 +36,11 @@ formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
 hdlr.setFormatter(formatter)
 logger.addHandler(hdlr)                                                 
 logger.setLevel(logging.INFO)
+
+filt_table = ascii.read('filter_info', data_start=1 , delimiter=' ')
+filt_list = filt_table['FILTER']
+pflat_list = filt_table['TV3']
+lflat_list = filt_table['Pipeline']
 
 # TODO Create diagnostic plots for each FLT frame with a histogram of pixel values after masking. Overplot  sigma-clipped mean and (sigma-clipped)
 # TODO median. We can look at these later and decide which typically works better.
@@ -160,9 +166,15 @@ def sigclip(data):
     clip_data = sigma_clip(data, sigma=2, iters=3)
     return clip_data
 
-def flat_field(data):
-    n_file = iref$sca2026 * pfl.fits
-    o_file = iref$uc7211 * pfl.fits
+def flat_field(data, filter, list_filt, tv3, pipeline):
+    for i in list_filt:
+        if list_filt[i] == filter:
+            pflat = tv3[i]
+            lflat = pipeline[i]
+        else:
+            continue
+    n_file = '/grp/hst/cdbs/iref/' + pflat
+    o_file = '/grp/hst/cdbs/iref/' + lflat
     o_flat = open_file(o_file)
     n_flat = open_file(n_file)
     o_data=o_flat[6:1019,6:1019]
@@ -232,7 +244,8 @@ def testing(f):
     # logger.info('TARGNAME: %s',targ)
     logger.info('EXPTIME: %s', expt)
     logger.info('FILTER: %s', filter)
-    data, dq = get_data(f)
+    data_pipe, dq = get_data(f)
+    data = flat_field(data_pipe, filter, filt_list, pflat_list, lflat_list)
     p_data = persistince_source(f)
     data_mask = np.copy(data)
     data_mask[dq != 0] = 0
@@ -284,17 +297,9 @@ def testing(f):
 def main():
     # list_file=glob.glob('/grp/hst/wfc3a/GO_Links/12167/Visit05/*flt.fits')
 
-    #logger = logging.getLogger('f098')
-    #hdlr = logging.FileHandler('/user/hkurtz/IR_flats/f098.log')
-    #formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-    #hdlr.setFormatter(formatter)
-    #logger.addHandler(hdlr)
-    #logger.setLevel(logging.INFO)
-    # logging.basicConfig(level=logging.INFO)
-    # logger = logging.getLogger(__name__)
     logger.info('The pipeline is starting')
 
-    dict={}
+
 
     pro_list = ['11702']
     #pro_list = ['11108', '11142', '11149', '11153', '11166', '11189', '11202', '11208', '11343', '11359',
@@ -311,26 +316,24 @@ def main():
     #            '14262', '13667', '14327', '14459', '14699', '14718', '14719', '14721', '15118', '15137',
     #            '15287', '13495', '13496', '13498', '13504', '14307', '14308']
     list_files = []
-    for i in range(len(pro_list)):
-        logger.info('Getting the data for QL')
-        list_file = quary_ql(pro_list[i], 'F098M')
-        for j in range(len(list_file)):
-            list_files.append(list_file[j])
-        # print(len(list_files))
-    # list_file=quary_ql('12025','F160W')
-    hdr = fits.getheader(list_files[0], 1)
-    nx = hdr['NAXIS1']
-    ny = hdr['NAXIS2']
-    nf = len(list_files)
-    set_data = fits.getdata(list_files[0], 1)
-    # data_array = np.empty((nf, ny, nx), dtype=float)
-    list_bad = []
-    list_good = []
-    list_lim = []
-    dict={}
-    p = Pool(8)
-    result = p.map(testing, list_files)
-    print(result)
+    for filt in filt_list['filter']:
+
+        for i in range(len(pro_list)):
+            logger.info('Getting the data for QL')
+            list_file = quary_ql(pro_list[i], filt)
+            for j in range(len(list_file)):
+                list_files.append(list_file[j])
+            # print(len(list_files))
+        # list_file=quary_ql('12025','F160W')
+        #hdr = fits.getheader(list_files[0], 1)
+        #nx = hdr['NAXIS1']
+        #ny = hdr['NAXIS2']
+        #nf = len(list_files)
+        #set_data = fits.getdata(list_files[0], 1)
+        # data_array = np.empty((nf, ny, nx), dtype=float)
+        p = Pool(8)
+        result = p.map(testing, list_files)
+        print(result)
 
 
 # print('good',len(list_good))
