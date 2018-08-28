@@ -302,6 +302,7 @@ def testing(f):
 
 
 def main():
+
     # list_file=glob.glob('/grp/hst/wfc3a/GO_Links/12167/Visit05/*flt.fits')
 
     logger.info('The pipeline is starting')
@@ -350,6 +351,5 @@ def main():
 
 # fits.writeto('test_F160_10_mean_sn5.fits', S_mean,overwrite=True)
 # fits.writeto('test_F160_10_median_sn5.fits', S_median,overwrite=True)
-
 
 main()
