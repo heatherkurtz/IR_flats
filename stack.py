@@ -17,10 +17,8 @@ def Stack(data_array_1):
 	image_sum = np.nansum(data_array_1, axis=0)
 	image_std = np.nanstd(data_array_1, axis=0)
 	image_min = np.nanmin(data_array_1, axis=0)
-	image_num = len(~np.isnan(data_array_1))
-	print (image_num)
 
-	return (image_mean, image_median, image_sum, image_std, image_min, image_num)
+	return (image_mean, image_median, image_sum, image_std, image_min)
 
 
 #def number_stack(data_array_1):
@@ -61,7 +59,6 @@ def main():
 	fits.writeto('test_F098_sum.fits', S_sum,overwrite=True)
 	fits.writeto('test_F098_std.fits', S_std,overwrite=True)
 	fits.writeto('test_F098_min.fits', S_min,overwrite=True)
-	fits.writeto('test_F098_num.fits', S_num,overwrite=True)
 	
 main()
 
