@@ -14,14 +14,15 @@ filters = [ 'F098M', 'F130N', 'F105W', 'F110W', 'F125W', 'F140W',  'F160W' ]
 #'F132N', 'F139M', 'F126N', 'F153M', 'F127M','F128N', 'F164N'
 #'F098M', 'F130N', 'F105W', 'F110W', 'F125W', 'F140W',  'F160W',
 
-def Stack(data_array_1):
+def Stack(data_array_1, signal_arr):
 	image_median = np.nanmedian(data_array_1, axis=0)
 	image_mean = np.nanmean(data_array_1, axis=0)
 	image_sum = np.nansum(data_array_1, axis=0)
+	image_signal = np.nansum(signal_arr, axis=0)
 	image_std = np.nanstd(data_array_1, axis=0)
 	image_min = np.nanmin(data_array_1, axis=0)
 
-	return (image_mean, image_median, image_sum, image_std, image_min)
+	return (image_mean, image_median, image_sum, image_std, image_min, image_signal)
 
 
 #def number_stack(data_array_1):
@@ -58,18 +59,24 @@ def main():
 		for i , f in enumerate(list_of_files):
 		
 			data_1=fits.getdata(f, 1)
+			hdr = fits.getheader(f, 0)
+			norm = hdr['NORM']
 			data_array[i, :, :] = data_1
-		S_mean,S_median,S_sum,S_std,S_min=Stack(data_array)
+			signal_arr[i, :, :] = data_1 * norm
+		S_mean,S_median,S_sum,S_std,S_min, S_signal=Stack(data_array, signal_arr)
 		n_mean = fil + '_mean.fits'
 		n_median = fil + '_median.fits'
 		n_sum = fil + '_sum.fits'
 		n_min = fil + '_min.fits'
 		n_std = fil + '_std.fits'
+		n_signal = fil + '_signal.fits'
 		fits.writeto(n_mean, S_mean,overwrite=True)
 		fits.writeto(n_median, S_median,overwrite=True)
 		fits.writeto(n_sum, S_sum,overwrite=True)
 		fits.writeto(n_std, S_std,overwrite=True)
 		fits.writeto(n_min, S_min,overwrite=True)
+		fits.writeto(n_signal, S_signal,overwrite=True)
+
 	
 main()
 
