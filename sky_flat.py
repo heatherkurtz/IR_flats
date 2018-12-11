@@ -122,6 +122,7 @@ def find_sources(data):
 
 
 def persistince_source(file):
+    print(file)
     try:
         p_file = file[:-19] + '/Persist' + file[-19:-9] + '_persist.fits'
         hdulist = fits.open(p_file)
@@ -401,6 +402,7 @@ def testing(f,propid,filter,ql_file):
     print(f,'writing flt')
     write_file(f, hdr1, data, propid, 'flt.fits', filter)
     
+    print('persistance for', ql_file)
     p_data = persistince_source(ql_file)
     data_mask = np.copy(data)
     data_mask[dq != 0] = 0
