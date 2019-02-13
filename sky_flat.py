@@ -39,13 +39,13 @@ from wfc3ir_tools import _reprocess_raw_crcorr
 
 # global variables: ie. logger
 logger = logging.getLogger('testing')
-hdlr = logging.FileHandler('/user/hkurtz/IR_flats/testing2.log')
+hdlr = logging.FileHandler('/user/hkurtz/IR_flats/test8.log')
 formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
 hdlr.setFormatter(formatter)
 logger.addHandler(hdlr)
 logger.setLevel(logging.INFO)
 
-filt_table = ascii.read('f110_info.txt', data_start=1, delimiter=' ')
+filt_table = ascii.read('f110_info.txt', data_start=1, delimiter=' ') #filter_info f110_info.txt 2nd_half_filters.txt wide_filterlist.txt
 filt_list = filt_table['FILTER']
 pflat_list = filt_table['TV3']
 lflat_list = filt_table['Pipeline']
@@ -70,7 +70,7 @@ def quary_ql(proid, filt):
         IR_flt_0.detector == 'ir',
         # IR_flt_0.imagetyp == 'flat',
         IR_flt_0.subarray == False,
-        IR_flt_0.exptime > 600,
+        IR_flt_0.exptime > 300,
         IR_flt_0.proposid == proid)
     # Turn the roots and dirs into locations we can use later.
     locales = ['{}_flt.fits'.format(os.path.join(item.dir, item.rootname)) for item in results]
@@ -86,7 +86,6 @@ def open_file(file):
 
 def get_data(file):
     hdulist = fits.open(file)
-    # masked_data=hdulist[1].data
     data = hdulist[1].data
     dq = hdulist[3].data
     hdulist.close()
@@ -102,9 +101,7 @@ def open_update(file):
 def dq_mask(dq, data, ims):
     bit_mask = (4 + 16 + 32 + 128 + 512)
     dq0 = np.bitwise_and(dq, np.zeros(np.shape(dq), 'Int16') + bit_mask)
-    # dq0 == 0
     dq0[dq0 > 0] = 1
-    # data[dq!=0]=np.nan
     ims[dq0 > 0] = 1
     data[ims > 0] = np.nan
 
@@ -114,7 +111,6 @@ def find_sources(data):
     sigma = 2.0 * gaussian_fwhm_to_sigma  # FWHM = 2.
     kernel = Gaussian2DKernel(sigma, x_size=3, y_size=3)
     kernel.normalize()
-    # print(kernel)
     segm = detect_sources(data, threshold, npixels=10, filter_kernel=kernel)
     seg = segm.array
     seg[seg > 0] = 1.0
@@ -122,14 +118,12 @@ def find_sources(data):
 
 
 def persistince_source(file):
-    print(file)
     try:
         p_file = file[:-19] + '/Persist' + file[-19:-9] + '_persist.fits'
         hdulist = fits.open(p_file)
         p_data = hdulist[1].data
     except FileNotFoundError:
         p_data = np.zeros((1014, 1014))
-
     return p_data
 
 
@@ -145,7 +139,6 @@ def mask_sources(seg):
 
 def convolve_data(seg_arr):
     g = Gaussian2DKernel(stddev=7)
-    # Convolve data
     dataC = convolve(seg_arr, g, boundary='extend')
     return dataC
 
@@ -153,7 +146,7 @@ def convolve_data(seg_arr):
 def write_file(file, hdr, plo, pro, end, filt):
     spro = str(pro)
     #file_name = '/grp/hst/wfc3v/hkurtz/sky_flats/short_run/' + filt + '/' + spro + '_' + file[-18:-8] + end
-    file_name = '/grp/hst/wfc3v/hkurtz/sky_flats/test/' + spro + '_' + file[-18:-8] + end
+    file_name = '/grp/hst/wfc3v/hkurtz/sky_flats/test_data/' + filt + '/' + spro + '_' + file[-18:-8] + end
     prihdu = fits.PrimaryHDU(header=hdr)
     single_extension1 = fits.ImageHDU(data=plo.astype(np.float32))
     all_extensions = [prihdu, single_extension1]
@@ -169,7 +162,7 @@ def normalize(data):
     return image, mean
 
 
-def normalize_region(data):  # use region [101:900,101:900]
+def normalize_region(data):
     values = data[101:900, 101:900]
     nonan = values[~np.isnan(values)]
     value, clow, chigh = sigmaclip(nonan, low=5, high=5)
@@ -178,17 +171,16 @@ def normalize_region(data):  # use region [101:900,101:900]
     return image, mean
 
 
-def stack(data_array_1):
-    image_median = np.nanmedian(data_array_1, axis=0)
-    image_mean = np.nanmean(data_array_1, axis=0)
-    image_sum = np.nansum(data_array_1, axis=0)
-    image_std = np.nanstd(data_array_1, axis=0)
-
-    return image_mean, image_median, image_sum, image_std
+#def stack(data_array_1):
+#    image_median = np.nanmedian(data_array_1, axis=0)
+#    image_mean = np.nanmean(data_array_1, axis=0)
+#    image_sum = np.nansum(data_array_1, axis=0)
+#    image_std = np.nanstd(data_array_1, axis=0)
+#
+#    return image_mean, image_median, image_sum, image_std
 
 
 def sigclip(data):
-    # sigmaclip the data
     clip_data = sigma_clip(data, sigma=2, iters=3)
     return clip_data
 
@@ -237,8 +229,6 @@ def get_header_data(f):
     FILTER = hdr1['FILTER']
 
     logger.info('[PROPOSID:, CAL_VER:, TARGNAME:] %s', [propid, calver, targ])
-    # logger.info('CAL_VER: %s',calver)
-    # logger.info('TARGNAME: %s',targ)
     logger.info('EXPTIME: %s', expt)
     logger.info('FILTER: %s', FILTER)
 
@@ -248,7 +238,6 @@ def add_to_header(hdr, norm_mean, mean, median, std, good_pix, used):
     hdr['Mean'] = mean
     hdr['Median'] = median
     hdr['STD'] = std
-    # hdr['Mode'] = mode
     hdr['PerGood'] = good_pix
     hdr['Used'] = used
 
@@ -258,7 +247,6 @@ def raw_header(file):
     samp = hdr['SAMP_SEQ']
     ap = hdr['APERTURE']
     filter_n = hdr['FILTER']
-    #aperature = ap.replace('-FIX','')
     date = hdr['EXPSTART']
     return(samp, ap, date,filter_n)
 
@@ -306,7 +294,8 @@ def match_dark(file,samp,ap,dark,sample,aper):
 
 
 def raw_2_flt(ql_file):
-    new_file = '/grp/hst/wfc3v/hkurtz/sky_flats/test/' + ql_file[-18:-8] + 'raw.fits'
+    current = os.getcwd()
+    new_file = '/grp/hst/wfc3v/hkurtz/sky_flats/test_input/' + ql_file[-18:-8] + 'raw.fits'
     file_ql = ql_file[:-8] + 'raw.fits'
     copyfile(file_ql, new_file)
     print(new_file)
@@ -314,7 +303,7 @@ def raw_2_flt(ql_file):
     hdr = hdulist[0].header
     asn = hdr['ASN_TAB']
     asn_ql = ql_file[:-18] + asn
-    asn_local = '/grp/hst/wfc3v/hkurtz/sky_flats/test/' + asn
+    asn_local = '/grp/hst/wfc3v/hkurtz/sky_flats/test_input/' + asn
     if asn != "NONE":
         copyfile(asn_ql, asn_local)
     samp,ap,date,filt = raw_header(new_file)
@@ -327,23 +316,15 @@ def raw_2_flt(ql_file):
     tv3_flat = flat_field(filt, filt_list, pflat_list)
     hdr['PFLTFILE'] = tv3_flat
     hdulist.close()
-    calwf3(new_file)
-
-
-#def check_ff(proid,targ):
- #   good_flt =[]
-  #  if proid in ff_list:
-   #     if "PAR" in targ:
-    #        good_flt.append(file)
-     #   else:
-      #      continue
-    #else:
-     #   good_flt.append(file)
-    #return(good_flt)
+    print("start calwf3")
+    os.chdir(new_file[:-18])
+    calwf3(new_file[-18:])
+    os.chdir(current)
+    print('finished calwf3 if there is no file we have a porblem')
 
 
 def check_ff(ql_file):
-    raw_f = '/grp/hst/wfc3v/hkurtz/sky_flats/test/' + ql_file[-18:-8] + 'raw.fits'
+    raw_f = '/grp/hst/wfc3v/hkurtz/sky_flats/test_input/' + ql_file[-18:-8] + 'raw.fits'
     raw_2_flt(ql_file)
     f=raw_f[:-8]+'flt.fits'
     logger.info(f)
@@ -353,52 +334,40 @@ def check_ff(ql_file):
     targ = hdr1['TARGNAME']
     expt = hdr1['EXPTIME']
     filter = hdr1['FILTER']
+    asn = hdr1['ASN_TAB']
     
 
     logger.info('[PROPOSID:, CAL_VER:, TARGNAME:] %s', [propid, calver, targ])
-    # logger.info('CAL_VER: %s',calver)
-    # logger.info('TARGNAME: %s',targ)
     logger.info('EXPTIME: %s', expt)
     logger.info('FILTER: %s', filter)
     if filter in refilter:
         #raw_file=f[:-8]+'raw.fits'
         print('entering cr_corr')
         print(raw_f)
-        _reprocess_raw_crcorr(raw_f)
-        print('entering flattend ramp')
-        make_flattened_ramp_flt(raw_f)#stats_subregion = None, outfile = None,
-    #else:
+        if asn == "NONE":
+            print("no ASN so cannnot use yet")
+        else:
+            _reprocess_raw_crcorr(raw_f)
+            print('entering flattend ramp')
+            make_flattened_ramp_flt(raw_f)#stats_subregion = None, outfile = None,
+    else:
         #continue
-        #print('filter_error')
+        print('filter_error')
     if propid in ff_list:
         if "PAR" in targ:
-            testing(f,propid,filter,ql_file)
+            print(f, "is a parallel observation")
         else:
-            print(f)
+            pipeline(f,propid,filter,ql_file)
     elif propid not in ff_list:
-       testing(f,propid,filter,ql_file)
+       pipeline(f,propid,filter,ql_file)
     return
 
 
-def testing(f,propid,filter,ql_file):
-    # logger = multiprocessing.get_logger()
-    # hdlr = logging.FileHandler('/user/hkurtz/IR_flats/098.log')
-    # formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-    # hdlr.setFormatter(formatter)
-    # logger.addHandler(hdlr)
-    # logger.setLevel(logging.INFO)
+def pipeline(f,propid,filter,ql_file):
 
     logger.info(f)
     hdr1 = fits.getheader(f, 0)
-    #propid = hdr1['PROPOSID']
-    #calver = hdr1['CAL_VER']
-    #targ = hdr1['TARGNAME']
-    #expt = hdr1['EXPTIME']
-    #filter = hdr1['FILTER']
-
-
     data, dq = get_data(f)
-    # if filter not in ['G141', 'G102']:
     print(f,'writing flt')
     write_file(f, hdr1, data, propid, 'flt.fits', filter)
     
@@ -428,10 +397,10 @@ def testing(f,propid,filter,ql_file):
     print(f,norm_mean, mean, median, std, per)
     #write_file(f, hdr1, image, propid, 'tes.fits', filter)
     if nan_siz > (dat_siz * 0.75):
-        # list_bad.append(f)
         logger.info('File has too many masked pixels. Not used.')
         used = 'per_bad'
-        #add_to_header(hdr1, norm_mean, mean, median, std, per, used)
+        if ~np.isnan(mean) & ~np.isnan(median) & ~np.isnan(norm_mean) & ~np.isnan(std) & ~np.isnan(per):
+            add_to_header(hdr1, norm_mean, mean, median, std, per, used)
         print(f,'writing pix')
         write_file(f, hdr1, image, propid, 'pix.fits', filter)
 
@@ -441,20 +410,19 @@ def testing(f,propid,filter,ql_file):
         diff = earth_lim_check(image)
         logger.info('Differance Mean-Median: %s', diff)
         if abs(diff) > 1.0011:
-            # list_lim.append(f)
             logger.info('File has Earthlim. Not used.')
             used = 'Earthlim'
-            #add_to_header(hdr1, norm_mean, mean, median, std, per, used)
+            if ~np.isnan(mean) & ~np.isnan(median) & ~np.isnan(norm_mean) & ~np.isnan(std) & ~np.isnan(per):
+                add_to_header(hdr1, norm_mean, mean, median, std, per, used)
             print(f,'writing elm')
             write_file(f, hdr1, image, propid, 'elm.fits', filter)
         else:
             used = 'yes'
-
-            #add_to_header(hdr1, norm_mean, mean, median, std, per, used)
+            if ~np.isnan(mean) & ~np.isnan(median) & ~np.isnan(norm_mean) & ~np.isnan(std) & ~np.isnan(per):
+                add_to_header(hdr1, norm_mean, mean, median, std, per, used)
             print(f,'writing mdi')
             write_file(f, hdr1, image, propid, 'mdi.fits', filter)
-            # data_array[i, :, :] = clipdata
-            # list_good.append(f)
+            #data_array[i, :, :] = clipdata
             logger.info('File Used.')
     return ()
 
@@ -463,9 +431,9 @@ def testing(f,propid,filter,ql_file):
 
 
 # def sub_check(data):
-#	ys,xs = np.shape(data)
-#	if ys!=1014 or xs!=1014:
-#		print ("Not a full array!")
+#   ys,xs = np.shape(data)
+#   if ys!=1014 or xs!=1014:
+#       print ("Not a full array!")
 #        return None,None
 
 
@@ -475,23 +443,23 @@ def main():
 
     logger.info('The pipeline is starting')
 
-    # pro_list = ['13000','14262','13667','14327','15118','11166','11101','11202','11208','11343','11557','11597','11600','11644',
-    #			'11650','11666','11669','11838','11624','12051','11709','11738','12177','12194','12247','12265','12471','12487',
-    #			'12496','12886','12942','12949','12990']
+    pro_list = ['13000','14262','13667','14327','15118','11166','11101','11202','11208','11343','11557','11597','11600','11644',
+                '11650','11666','11669','11838','11624','12051','11709','11738','12177','12194','12247','12265','12471','12487',
+                '12496','12886','12942','12949','12990']
 
-    pro_list = ['11108', '11142', '11149', '11153', '11166', '11189', '11202', '11208', '11343', '11359',
-                '11519', '11520', '11534', '11541', '11557', '11563', '11584', '11597', '11600', '11644',
-                '11650', '11666', '11669', '11694', '11700', '11702', '11735', '11838', '11840', '11587',
-                '11528', '11624', '12051', '12005', '11709', '11738', '11602', '11663', '12064', '12197',
-                '12224', '12203', '11696', '12184', '12099', '12307', '12329', '12065', '12061', '12068',
-                '12286', '12283', '12167', '11591', '12328', '12616', '12453', '12286', '12440', '12460',
-                '12581', '11636', '11734', '12060', '12062', '12063', '12064', '12177', '12194', '12247',
-                '12265', '12442', '12443', '12444', '12445', '12471', '12487', '12496', '12498', '12451',
-                '12578', '12764', '12886', '12905', '12930', '12942', '12949', '12959', '12960', '12974',
-                '12990', '13000', '13002', '13045', '13110', '13117', '13294', '13303', '13480', '13614',
-                '13641', '13644', '13688', '13718', '13792', '13793', '13831', '13844', '13868', '13951',
-                '14262', '13667', '14327', '14459', '14699', '14718', '14719', '14721', '15118', '15137',
-                '15287', '13495', '13496', '13498', '13504', '14037', '14038']
+    #pro_list = ['11108', '11142', '11149', '11153', '11166', '11189', '11202', '11208', '11343', '11359',
+    #            '11519', '11520', '11534', '11541', '11557', '11563', '11584', '11597', '11600', '11644',
+    #            '11650', '11666', '11669', '11694', '11700', '11702', '11735', '11838', '11840', '11587',
+    #            '11528', '11624', '12051', '12005', '11709', '11738', '11602', '11663', '12064', '12197',
+    #            '12224', '12203', '11696', '12184', '12099', '12307', '12329', '12065', '12061', '12068',
+    #            '12286', '12283', '12167', '11591', '12328', '12616', '12453', '12286', '12440', '12460',
+    #            '12581', '11636', '11734', '12060', '12062', '12063', '12064', '12177', '12194', '12247',
+    #            '12265', '12442', '12443', '12444', '12445', '12471', '12487', '12496', '12498', '12451',
+    #            '12578', '12764', '12886', '12905', '12930', '12942', '12949', '12959', '12960', '12974',
+    #            '12990', '13000', '13002', '13045', '13110', '13117', '13294', '13303', '13480', '13614',
+    #            '13641', '13644', '13688', '13718', '13792', '13793', '13831', '13844', '13868', '13951',
+    #            '14262', '13667', '14327', '14459', '14699', '14718', '14719', '14721', '15118', '15137',
+    #            '15287', '13495', '13496', '13498', '13504', '14037', '14038']
     list_files = []
     for filt in filt_list:
 
@@ -503,7 +471,7 @@ def main():
             print(len(list_files))
     current = os.getcwd()
 
-    base_path = '/grp/hst/wfc3v/hkurtz/sky_flats/test/'
+    base_path = '/grp/hst/wfc3v/hkurtz/sky_flats/test_input/'
 
     #os.chdir(base_path)
     #list_files = glob.glob('*flt.fits')
