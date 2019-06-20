@@ -54,7 +54,7 @@ def find_bad_reads(ratio):
 def recal(loc, file, leng):
 	for r_loc in loc:
 		if r_loc != (leng-1):
-			read = r_loc + 1
+			read = r_loc + 2
 			fits.setval(file,extver=read,extname='DQ',keyword='pixvalue',value=1024)
 
 
@@ -72,7 +72,7 @@ def header_update(file, median, loc):
 	exp = hdr['EXPTIME']
 	hdr['OLDEXPT'] = exp
 	hdr['EXPTIME'] = median
-	location = loc + 1
+	location = loc + 2
 	hdr.set('bad_read', str(location))
 	hdu.close()
 
