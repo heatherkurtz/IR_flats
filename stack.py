@@ -10,9 +10,9 @@ import numpy.ma as ma
 import glob
 import os
 
-#filters = [ 'F098M', 'F130N', 'F105W', 'F110W', 'F125W', 'F140W',  'F160W' ]
-filters = ['early_140','ben_140']
-#'F132N', 'F139M', 'F126N', 'F153M', 'F127M','F128N', 'F164N'
+#filters = [ 'F098M', 'F105W', 'F110W', 'F125W', 'F140W',  'F160W' ]
+filters = ['F140W',  'F160W']
+#'F132N', 'F139M', 'F126N', 'F153M', 'F127M','F128N', 'F164N', 'F130N',
 #'F098M', 'F130N', 'F105W', 'F110W', 'F125W', 'F140W',  'F160W',
 
 def Stack(data_array_1, signal_arr):
@@ -31,32 +31,32 @@ def Stack(data_array_1, signal_arr):
 
 
 def pixels(ar):
-    for i in range(len(ar[0,:,:])):
-        for j in range(len(ar[0,0,:])):
-            #pix = (ar[:,i,j])
-            pix = (ar[:,i,j])
-            bad = np.isnan(pix).sum()
-            len_all = len(pix)
-            val = int((len_all - bad)/2)
-            if val < 2:
-            	print('bad_pixel')
-            else:
-            	r = pyasl.generalizedESD(pix, val, 5.0, fullOutput=True)
-            pix[r[1][:]] = np.nan
-            ar[:,i,j]=pix
+	for i in range(len(ar[0,:,:])):
+		for j in range(len(ar[0,0,:])):
+			#pix = (ar[:,i,j])
+			pix = (ar[:,i,j])
+			bad = np.isnan(pix).sum()
+			len_all = len(pix)
+			val = int((len_all - bad)/2)
+			if val < 2:
+				print('bad_pixel')
+			else:
+				r = pyasl.generalizedESD(pix, val, 5.0, fullOutput=True)
+			pix[r[1][:]] = np.nan
+			ar[:,i,j]=pix
 
 
 def ind_pixel(ar,i,j):
 	pix = (ar[:,i,j])
-    bad = np.isnan(pix).sum()
-    len_all = len(pix)
-    val = int((len_all - bad)/2)
-    if val < 2:
-    	print('bad_pixel')
-    else:
-    	r = pyasl.generalizedESD(pix, val, 5.0, fullOutput=True)
-    pix[r[1][:]] = np.nan
-    ar[:,i,j]=pix
+	bad = np.isnan(pix).sum()
+	len_all = len(pix)
+	val = int((len_all - bad)/2)
+	if val < 2:
+		print('bad_pixel')
+	else:
+		r = pyasl.generalizedESD(pix, val, 5.0, fullOutput=True)
+	pix[r[1][:]] = np.nan
+	ar[:,i,j]=pix
 
 
 def main():
@@ -64,7 +64,7 @@ def main():
 	#gets current directory
 	current = os.getcwd()
 	#base_path = '/user/hkurtz/IR_flats/test_f098'
-	base_path = '/grp/hst/wfc3v/hkurtz/sky_flats/for_Ben/'
+	base_path = '/grp/hst/wfc3v/hkurtz/sky_flats/June10_run/'
 	#shange directory to the base path
 	os.chdir(base_path)
 	
@@ -90,8 +90,16 @@ def main():
 			hdr = fits.getheader(f, 0)
 			norm = hdr['NORM']
 			exptime = hdr['EXPTIME']
-			data_array[i, :, :] = data_1
-			signal_arr[i, :, :] = data_1 * norm * exptime
+			flag = hdr['EXPFLAG']
+			if flag != 'indeterminate':
+				if exptime > 300:
+					data_array[i, :, :] = data_1
+					signal_arr[i, :, :] = data_1 * norm * exptime
+			else:
+				print('short exposre or bad expflag')
+				data_array[i, :, :] = np.nan
+				signal_arr[i, :, :] = np.nan * norm * exptime
+
 		#pixels(data_array)
 		ind_pixel(data_array,30,30)
 		S_mean,S_median,S_sum,S_std,S_min, S_signal=Stack(data_array, signal_arr)

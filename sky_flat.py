@@ -40,7 +40,7 @@ import earth_lim_cor
 
 # global variables: ie. logger
 logger = logging.getLogger('testing')
-hdlr = logging.FileHandler('/user/hkurtz/IR_flats/June10_files.log')
+hdlr = logging.FileHandler('/user/hkurtz/IR_flats/July_tests.log')
 formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
 hdlr.setFormatter(formatter)
 logger.addHandler(hdlr)
@@ -57,7 +57,7 @@ asn_bad = ['ibohbb020_asn.fits','idix06010_asn.fits','ic8mb7030_asn.fits','icqtb
           'icqt60020_asn.fits','icwb0p020_asn.fits','idix02010_asn.fits','iboi6k020_asn.fits','iboi6o020_asn.fits','iboi6c020_asn.fits','iboi6f020_asn.fits',
           'iboi6g020_asn.fits','iboi6h020_asn.fits','iboi6i020_asn.fits','iboi6j020_asn.fits','id8l03020_asn.fits','id5r10010_asn.fits','idix02020_asn.fits',
           'idia22020_asn.fits','idia22030_asn.fits','idia22010_asn.fits','idia04010_asn.fits','idia04020_asn.fits','idia04030_asn.fits','ic8mb7040_asn.fits',
-          'icqtb5030_asn.fits','icqtb7030_asn.fits','icqt93040_asn.fits','icqt94040_asn.fits','icqt82040_asn.fits','ibohbe020_asn.fits']
+          'icqtb5030_asn.fits','icqtb7030_asn.fits','icqt93040_asn.fits','icqt94040_asn.fits','icqt82040_asn.fits','ibohbe020_asn.fits', 'ibohbe020_asn.fits']
 key_bad = ['/grp/hst/wfc3v/hkurtz/sky_flats/input_data/ibl71ki4q_raw.fits', '/grp/hst/wfc3v/hkurtz/sky_flats/input_data/iboi4qipq_raw.fits', 
            '/grp/hst/wfc3v/hkurtz/sky_flats/input_data/iboi4qihq_raw.fits', '/grp/hst/wfc3v/hkurtz/sky_flats/input_data/iboi4qieq_raw.fits',
            '/grp/hst/wfc3v/hkurtz/sky_flats/input_data/ibl71ki2q_raw.fits', '/grp/hst/wfc3v/hkurtz/sky_flats/input_data/iboi4qilq_raw.fits']
@@ -107,12 +107,19 @@ def open_update(file):
     return data
 
 
-def dq_mask(dq, data, ims):
-    bit_mask = (4 + 16 + 32 + 128 + 512)
+def dq_convolved_mask(dq, data, ims):
+    bit_mask = (4 + 32 + 128 + 512)
     dq0 = np.bitwise_and(dq, np.zeros(np.shape(dq), 'Int16') + bit_mask)
     dq0[dq0 > 0] = 1
     ims[dq0 > 0] = 1
     data[ims > 0] = np.nan
+
+
+def dq_mask(dq, data):
+    bit_mask = (512)
+    dq0 = np.bitwise_and(dq, np.zeros(np.shape(dq), 'Int16') + bit_mask)
+    dq0[dq0 > 0] = 1
+    data[dq0 > 0] = np.nan
 
 
 def find_sources(data):
@@ -156,7 +163,7 @@ def convolve_data(seg_arr):
 def write_file(file, hdr, plo, pro, end, filt):
     spro = str(pro)
     #file_name = '/grp/hst/wfc3v/hkurtz/sky_flats/short_run/' + filt + '/' + spro + '_' + file[-18:-8] + end
-    file_name = '/grp/hst/wfc3v/hkurtz/sky_flats/June10_run/' + filt + '/' + spro + '_' + file[-18:-8] + end
+    file_name = '/grp/hst/wfc3v/hkurtz/sky_flats/aug26_test_flag512onlyinseg_run/' + filt + '/' + spro + '_' + file[-18:-8] + end
     prihdu = fits.PrimaryHDU(header=hdr)
     single_extension1 = fits.ImageHDU(data=plo.astype(np.float32))
     all_extensions = [prihdu, single_extension1]
@@ -312,7 +319,7 @@ def match_dark(file,dark,samp,sample,dark_mjd,date):
 
 def raw_2_flt(ql_file):
     current = os.getcwd()
-    new_file = '/grp/hst/wfc3v/hkurtz/sky_flats/June10_input/' + ql_file[-18:-8] + 'raw.fits'
+    new_file = '/grp/hst/wfc3v/hkurtz/sky_flats/aug26_test_flag512onlyinseg_input/' + ql_file[-18:-8] + 'raw.fits'
     file_ql = ql_file[:-8] + 'raw.fits'
     copyfile(file_ql, new_file)
     print(new_file)
@@ -323,10 +330,13 @@ def raw_2_flt(ql_file):
  #       print('no asn')
   #  else:
     asn_ql = ql_file[:-18] + asn
-    asn_local = '/grp/hst/wfc3v/hkurtz/sky_flats/June10_input/' + asn
+    asn_local = '/grp/hst/wfc3v/hkurtz/sky_flats/aug26_test_flag512onlyinseg_input/' + asn
+    if asn == "NONE":
+        print("have to make ASN")
     if asn != "NONE":
         try:
             copyfile(asn_ql, asn_local)
+            print("ASN copied")
         except FileNotFoundError:
             print('no asn')
     samp,ap,date,filt = raw_header(new_file)
@@ -347,7 +357,11 @@ def raw_2_flt(ql_file):
 
 
 def check_ff(ql_file):
-    raw_f = '/grp/hst/wfc3v/hkurtz/sky_flats/June10_input/' + ql_file[-18:-8] + 'raw.fits'
+    current = os.getcwd()
+    cal_dir = '/grp/hst/wfc3v/hkurtz/sky_flats/aug26_test_flag512onlyinseg_input/'
+    os.chdir(cal_dir)
+    print(os.getcwd())
+    raw_f = '/grp/hst/wfc3v/hkurtz/sky_flats/aug26_test_flag512onlyinseg_input/' + ql_file[-18:-8] + 'raw.fits'
     raw_2_flt(ql_file)
     f=raw_f[:-8]+'flt.fits'
     print(f)
@@ -368,17 +382,33 @@ def check_ff(ql_file):
     earth_lim_cor.e_lim_cor(raw_f)
     if filter in refilter:
         #raw_file=f[:-8]+'raw.fits'
+        #print(raw_file)
     #    print('entering cr_corr')
     #    print(raw_f)
-        if asn == "NONE":
-            print("no ASN so cannnot use yet")
-        else:
-            asn_local = '/grp/hst/wfc3v/hkurtz/sky_flats/June10_input/' + asn
-            if os.path.isfile(asn_local):
-                print('true')
-                _reprocess_raw_crcorr(raw_f)
-                print('entering flattend ramp')
-                make_flattened_ramp_flt(raw_f)#stats_subregion = None, outfile = None,
+        #if asn == "NONE":
+        #    print("no ASN so cannnot use yet")
+        #else:
+        #    asn_local = '/grp/hst/wfc3v/hkurtz/sky_flats/test_h/input/' + asn
+        #    if os.path.isfile(asn_local):
+        #        print('true')
+        #_reprocess_raw_crcorr(raw_f)
+        #raw_hdu = fits.open(raw_f)
+        #asn_tab = raw_hdu[0].header['ASN_TAB']
+        print('start asn')
+        if asn == 'NONE': #make dummy asn table. remove this clause once calwf3 is patched
+            new_asn_tab = np.rec.array([(os.path.basename(raw_f)[0:9],'EXP-DTH', 1)], formats = 'S14,S14,i1', names='MEMNAME,MEMTYPE,MEMPRSNT')
+            hdu_1 = fits.BinTableHDU(new_asn_tab)
+            none_hdu_list = fits.HDUList([fits.open(raw_f)[0], hdu_1])
+            print('asn made')
+            asn_name = raw_f[-18:-8] + 'asn.fits'
+            hdu = fits.open(raw_f, mode='update')
+            hdu[0].header['ASN_TAB'] = asn_name
+            #hdr['ASN_TAB'] = asn_name
+            hdu.close()
+            print('write out asn')
+            none_hdu_list.writeto(raw_f[:-8]+'asn.fits')
+        print('entering flattend ramp')
+        make_flattened_ramp_flt(raw_f[-18:])#stats_subregion = None, outfile = None,
     #else:
         #continue
     #    print('filter_error')
@@ -391,6 +421,7 @@ def check_ff(ql_file):
             print(f, "is a NOT a parallel observation")
     elif propid not in ff_list:
        pipeline(f,propid,filter,ql_file)
+    os.chdir(current)
     return
 
 
@@ -404,14 +435,24 @@ def pipeline(f,propid,filter,ql_file):
     print(f, hdr1['EXPTIME'])
     print('persistance for', ql_file)
     p_data = persistince_source(ql_file)
-    data_mask = np.copy(data)
-    data_mask[dq != 0] = 0
-    seg = find_sources(data_mask)
+    data_copy = np.copy(data)
+    #data_mask[dq != 0] = 0
+    dq_mask(dq, data_copy)
+    #took out of funchtion with it work better?
+    threshold = detect_threshold(data_copy, snr=0.85)
+    sigma = 2.0 * gaussian_fwhm_to_sigma  # FWHM = 2.
+    kernel = Gaussian2DKernel(sigma, x_size=3, y_size=3)
+    #kernel.normalize()
+    segm = detect_sources(data_copy, threshold, npixels=10, filter_kernel=kernel)
+    print(segm)
+    seg = segm.data
+    seg[seg > 0] = 1.0
+    #eg = find_sources(data_mask) #end of function move to main
     print(f,'writing seg')
     write_file(f, hdr1, seg, propid, 'seg.fits', filter)
     dataC = convolve_data(seg)
     im = mask_sources(dataC)
-    dq_mask(dq, data, im)
+    dq_convolved_mask(dq, data, im)
     persistince_masks(data, p_data)
     write_file(f, hdr1, data, propid, 'per.fits', filter)
     image, norm_mean = normalize_region(data)
@@ -475,23 +516,23 @@ def main():
 
     logger.info('The pipeline is starting')
 
-    pro_list = ['13000','14262']#'13667','14327','15118','11166','11101','11202','11208','11343','11557','11597','11600','11644',
+    #pro_list = ['13831','12460']#,'13667','14327','15118','11166']#,'11101','11202','11208','11343','11557','11597','11600','11644',
     #            '11650','11666','11669','11838','11624','12051','11709','11738','12177','12194','12247','12265','12471','12487',
     #            '12496','12886','12942','12949','12990']
 
     #pro_list = ['11108', '11142', '11149', '11153', '11166', '11189', '11202', '11208', '11343', '11359',
     #            '11519', '11520', '11534', '11541', '11557', '11563', '11584', '11597', '11600', '11644',
     #            '11650', '11666', '11669', '11694', '11700', '11702', '11735', '11838', '11840', '11587',
-    #            '11528', '11624', '12051', '12005', '11709', '11738', '11602', '11663', '12064', '12197',
+    #            '11528', '11624', '12051', '12005', '11709', '11738', '11602', '11663', '12064', '13056',
     #            '12224', '12203', '11696', '12184', '12099', '12307', '12329', '12065', '12061', '12068',
-    #            '12286', '12283', '12167', '11591', '12328', '12616', '12453', '12286', '12440', '12460',
+    #            '12286', '12283', '12167', '12328', '12616', '12453', '12286', '12440', '12460',' 14038',
     #            '12581', '11636', '11734', '12060', '12062', '12063', '12064', '12177', '12194', '12247',
     #            '12265', '12442', '12443', '12444', '12445', '12471', '12487', '12496', '12498', '12451',
     #            '12578', '12764', '12886', '12905', '12930', '12942', '12949', '12959', '12960', '12974',
     #            '12990', '13000', '13002', '13045', '13110', '13117', '13294', '13303', '13480', '13614',
     #            '13641', '13644', '13688', '13718', '13792', '13793', '13831', '13844', '13868', '13951',
     #            '14262', '13667', '14327', '14459', '14699', '14718', '14719', '14721', '15118', '15137',
-    #            '15287', '13495', '13496', '13498', '13504', '14037', '14038', '13056']
+    #            '15287', '13495', '13496', '13498', '13504', '14037']
     list_files = []
    # for filt in filt_list:
 
@@ -514,10 +555,12 @@ def main():
         if f in key_bad:
             print(f,'bad_key')
         #elif filt == 'F105W':
-        #	list_files.append(f)
+         #   list_files.append(f)
+        #elif filt == 'F110W':
+         #   list_files.append(f)
         else:
             list_files.append(f)
-         #   print('skiped')
+        #    print('skiped')
     #    hdr = fits.getheader(f, 0)
     #    filt = hdr['FILTER']
     #    if filt == 'F105W':

@@ -9,24 +9,42 @@ import os
 from astropy.io import fits
 
 
-def e_lim_cor(file):
-	print(file)
+def e_lim_cor(f):
+	print(f)
+	file=f[-18:]
 	ima = file[:-8] + 'ima.fits'
 	flt = file[:-8] + 'flt.fits'
+	#tra = file[:-9] + '.tra'
 	ratio = get_ratio(ima)
 	print(ratio)
 	#f_loc = np.where(ratio > 1.03)
 	print('earth cor')
 	loc, leng = find_bad_reads(ratio)
-	print('loc')
-	recal(loc, file, leng)
-	print('recall')
+	print('loc',loc)
+	location = loc + 2
+	print('location',location)
+	if 0 in loc:
+		print('1 in loc')
+		recal(loc, file, leng)
+	else:
+		recal(loc, file, leng)
+		print('end in loc')
+	print('recal')
 	os.remove(ima)
 	os.remove(flt)
+	#os.remove(tra)
+	if os.path.isfile(file):
+		print('yes')
+	else:
+		print('NO')
+	current = os.getcwd()
+	cal_dir = f[:-18]
+	os.chdir(cal_dir)
 	print(os.getcwd())
 	calwf3(file)
 	time = gettime(file)
 	header_update(file, time, loc)
+	os.chdir(current)
 
 
 
@@ -52,10 +70,21 @@ def find_bad_reads(ratio):
 
 
 def recal(loc, file, leng):
+	print(file)
 	for r_loc in loc:
-		if r_loc != (leng-1):
-			read = r_loc + 2
+		if r_loc != (leng):
+			read = r_loc + 1
+			print(read)
 			fits.setval(file,extver=read,extname='DQ',keyword='pixvalue',value=1024)
+
+
+#def recalend(loc, file, leng):
+#	print(file)
+#	for r_loc in loc:
+#		if r_loc != (leng):
+#			read = r_loc + 1
+#			print(read)
+#			fits.setval(file,extver=read,extname='DQ',keyword='pixvalue',value=1024)
 
 
 def gettime(file):
@@ -72,7 +101,8 @@ def header_update(file, median, loc):
 	exp = hdr['EXPTIME']
 	hdr['OLDEXPT'] = exp
 	hdr['EXPTIME'] = median
-	location = loc + 2
+	location = loc + 1
+	print(location)
 	hdr.set('bad_read', str(location))
 	hdu.close()
 
