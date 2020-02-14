@@ -11,7 +11,7 @@ import numpy.ma as ma
 import glob
 import os
 
-filters = ['F160W']#[ 'F098M', 'F130N', 'F105W', 'F110W', 'F125W', 'F140W',  'F160W' ]
+filters = ['F110W']#[ 'F098M', 'F130N', 'F105W', 'F110W', 'F125W', 'F140W',  'F160W' ]
 
 #'F132N', 'F139M', 'F126N', 'F153M', 'F127M','F128N', 'F164N'
 #'F098M', 'F130N', 'F105W', 'F110W', 'F125W', 'F140W',  'F160W',
@@ -41,8 +41,9 @@ def get_expstar(file,mjd_list):
 
 
 def read_in_bpix():
-	filt_table = ascii.read('/user/hkurtz/IR_flats/bpixtab_summary.txt', data_start=2, delimiter=' ')
-	usaftermjd = filt_table['useafter_mjd']
+	filt_table = ascii.read('/user/holszewski/IR_flats/bpixtab_summary.txt', data_start=1, delimiter=',')
+	bpixtab = filt_table['col1']
+	usaftermjd = filt_table['col3']
 	return (usaftermjd)
 
 
@@ -51,7 +52,7 @@ def main():
 	#gets current directory
 	current = os.getcwd()
 	#base_path = '/user/hkurtz/IR_flats/test_f098'
-	base_path = '/grp/hst/wfc3v/hkurtz/sky_flats/no512/'
+	base_path = '/grp/hst/wfc3v/hkurtz/sky_flats/oct16_no512_run/'
 	#shange directory to the base path
 	os.chdir(base_path)
 	

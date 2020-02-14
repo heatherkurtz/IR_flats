@@ -96,15 +96,21 @@ def gettime(file):
 
 def header_update(file, median, loc):
 	flt = file[:-8]+'flt.fits'
+	raw_hdu = fits.open(file, mode='update')
 	hdu = fits.open(flt, mode='update')
 	hdr = hdu[0].header
+	raw_hdr = raw_hdu[0].header
 	exp = hdr['EXPTIME']
 	hdr['OLDEXPT'] = exp
 	hdr['EXPTIME'] = median
+	raw_hdr['OLDEXPT'] = exp
+	raw_hdr['EXPTIME'] = median
 	location = loc + 1
 	print(location)
 	hdr.set('bad_read', str(location))
+	raw_hdr.set('bad_read', str(location))
 	hdu.close()
+	raw_hdu.close()
 
 
 #def main():
