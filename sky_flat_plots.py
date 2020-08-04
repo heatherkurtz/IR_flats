@@ -188,8 +188,9 @@ def main():
     propid=hdr1['PROPOSID']
     data,dq=get_data(f)
     segm=find_sources(data)
+    #print(segm.cmap)
     fig, (ax1) = plt.subplots(1, 1, figsize=(5, 5))
-    ax1.imshow(segm, origin='lower',cmap=segm.cmap(random_state=12345))
+    ax1.imshow(segm, origin='lower')#,cmap=segm.cmap(random_state=12345))
     plt.show()
     seg=segm.array
     seg[seg>0]=1.0
