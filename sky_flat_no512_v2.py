@@ -40,7 +40,7 @@ import earth_lim_cor
 
 # global variables: ie. logger
 logger = logging.getLogger('testing')
-hdlr = logging.FileHandler('/user/holszewski/IR_flats/Feb26_tests.log')
+hdlr = logging.FileHandler('/user/holszewski/IR_flats/jan_el_tests.log')
 formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
 hdlr.setFormatter(formatter)
 logger.addHandler(hdlr)
@@ -114,7 +114,7 @@ def open_update(file):
 
 
 def dq_convolved_mask(dq, data, ims):
-    bit_mask = (4 + 8 + 32 + 128 + 512)
+    bit_mask = (4 + 8 + 32 + 128)# + 512
     dq0 = np.bitwise_and(dq, np.zeros(np.shape(dq), 'Int16') + bit_mask)
     dq0[dq0 > 0] = 1
     ims[dq0 > 0] = 1
@@ -181,7 +181,7 @@ def convolve_data(seg_arr):
 def write_file(file, hdr, plo, pro, end, filt):
     spro = str(pro)
     #file_name = '/grp/hst/wfc3v/hkurtz/sky_flats/short_run/' + filt + '/' + spro + '_' + file[-18:-8] + end
-    file_name = '/grp/hst/wfc3v/hkurtz/sky_flats/Feb24_20_run/' + filt + '/' + spro + '_' + file[-18:-8] + end
+    file_name = '/grp/hst/wfc3v/hkurtz/sky_flats/Feb24_20_no512_run/' + filt + '/' + spro + '_' + file[-18:-8] + end
     prihdu = fits.PrimaryHDU(header=hdr)
     single_extension1 = fits.ImageHDU(data=plo.astype(np.float32))
     all_extensions = [prihdu, single_extension1]
@@ -337,7 +337,7 @@ def match_dark(file,dark,samp,sample,dark_mjd,date):
 
 def raw_2_flt(ql_file):
     current = os.getcwd()
-    new_file = '/grp/hst/wfc3v/hkurtz/sky_flats/Feb24_20_input/' + ql_file[-18:-8] + 'raw.fits'
+    new_file = '/grp/hst/wfc3v/hkurtz/sky_flats/Feb24_20_no512_input/' + ql_file[-18:-8] + 'raw.fits'
     file_ql = ql_file[:-8] + 'raw.fits'
     copyfile(file_ql, new_file)
     print(new_file)
@@ -348,7 +348,7 @@ def raw_2_flt(ql_file):
         print('no asn')
     else:
         asn_ql = ql_file[:-18] + asn
-        asn_local = '/grp/hst/wfc3v/hkurtz/sky_flats/Feb24_20_input/' + asn
+        asn_local = '/grp/hst/wfc3v/hkurtz/sky_flats/Feb24_20_no512_input/' + asn
         if asn == "NONE":
             print("have to make ASN")
         if asn != "NONE":
@@ -376,10 +376,10 @@ def raw_2_flt(ql_file):
 
 def check_ff(ql_file):
     current = os.getcwd()
-    cal_dir = '/grp/hst/wfc3v/hkurtz/sky_flats/Feb24_20_input/'
+    cal_dir = '/grp/hst/wfc3v/hkurtz/sky_flats/Feb24_20_no512_input/'
     os.chdir(cal_dir)
     print(os.getcwd())
-    raw_f = '/grp/hst/wfc3v/hkurtz/sky_flats/Feb24_20_input/' + ql_file[-18:-8] + 'raw.fits'
+    raw_f = '/grp/hst/wfc3v/hkurtz/sky_flats/Feb24_20_no512_input/' + ql_file[-18:-8] + 'raw.fits'
     raw_2_flt(ql_file)
     f=raw_f[:-8]+'flt.fits'
     print(f)
@@ -496,7 +496,7 @@ def pipeline(f,propid,filter,ql_file):
     dataC = convolve_data(seg)
     im = mask_sources(dataC)
     dq_convolved_mask(dq, data, im)
-    weak_blob_mask_convolve(data)
+    #weak_blob_mask_convolve(data)
     persistince_masks(data, p_data)
     write_file(f, hdr1, data, propid, 'per.fits', filter)
     image, norm_mean = normalize_region(data)

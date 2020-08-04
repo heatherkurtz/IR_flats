@@ -40,7 +40,7 @@ import earth_lim_cor
 
 # global variables: ie. logger
 logger = logging.getLogger('testing')
-hdlr = logging.FileHandler('/user/holszewski/IR_flats/Feb26_tests.log')
+hdlr = logging.FileHandler('/user/holszewski/IR_flats/noflat_no512_mar5.log')
 formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
 hdlr.setFormatter(formatter)
 logger.addHandler(hdlr)
@@ -64,6 +64,8 @@ asn_bad = ['idgb67010_asn.fits', 'idxm08010_asn.fits', 'idgbg7010_asn.fits', 'id
           #'idia22020_asn.fits','idia22030_asn.fits','idia22010_asn.fits','idia04010_asn.fits','idia04020_asn.fits','idia04030_asn.fits','ic8mb7040_asn.fits',
           #'icqtb5030_asn.fits','icqtb7030_asn.fits','icqt93040_asn.fits','icqt94040_asn.fits','icqt82040_asn.fits','ibohbe020_asn.fits', 'ibohbe020_asn.fits',
           #'idgb67010_asn.fits', 'idgb93010_asn.fits']
+
+
 key_bad = ['/grp/hst/wfc3v/hkurtz/sky_flats/input_data/ibl71ki4q_raw.fits', '/grp/hst/wfc3v/hkurtz/sky_flats/input_data/iboi4qipq_raw.fits', 
            '/grp/hst/wfc3v/hkurtz/sky_flats/input_data/iboi4qihq_raw.fits', '/grp/hst/wfc3v/hkurtz/sky_flats/input_data/iboi4qieq_raw.fits',
            '/grp/hst/wfc3v/hkurtz/sky_flats/input_data/ibl71ki2q_raw.fits', '/grp/hst/wfc3v/hkurtz/sky_flats/input_data/iboi4qilq_raw.fits']
@@ -96,6 +98,7 @@ key_bad = ['/grp/hst/wfc3v/hkurtz/sky_flats/input_data/ibl71ki4q_raw.fits', '/gr
 def open_file(file):
     hdulist = fits.open(file)
     data = hdulist[1].data
+    #print(data)
     return data
 
 
@@ -114,7 +117,7 @@ def open_update(file):
 
 
 def dq_convolved_mask(dq, data, ims):
-    bit_mask = (4 + 8 + 32 + 128 + 512)
+    bit_mask = (4 + 8 + 32 + 128)
     dq0 = np.bitwise_and(dq, np.zeros(np.shape(dq), 'Int16') + bit_mask)
     dq0[dq0 > 0] = 1
     ims[dq0 > 0] = 1
@@ -181,7 +184,7 @@ def convolve_data(seg_arr):
 def write_file(file, hdr, plo, pro, end, filt):
     spro = str(pro)
     #file_name = '/grp/hst/wfc3v/hkurtz/sky_flats/short_run/' + filt + '/' + spro + '_' + file[-18:-8] + end
-    file_name = '/grp/hst/wfc3v/hkurtz/sky_flats/Feb24_20_run/' + filt + '/' + spro + '_' + file[-18:-8] + end
+    file_name = '/grp/hst/wfc3v/hkurtz/sky_flats/Mar4_noflat_no512_run/' + filt + '/' + spro + '_' + file[-18:-8] + end
     prihdu = fits.PrimaryHDU(header=hdr)
     single_extension1 = fits.ImageHDU(data=plo.astype(np.float32))
     all_extensions = [prihdu, single_extension1]
@@ -335,9 +338,36 @@ def match_dark(file,dark,samp,sample,dark_mjd,date):
     return(good_dark)
 
 
+def segment_pipeline(f,propid,filter,ql_file):
+    hdr1 = fits.getheader(f, 0)
+    data, dq = get_data(f)
+    print(f,'writing flt')
+    write_file(f, hdr1, data, propid, 'flt.fits', filter)
+    print(f, hdr1['EXPTIME'])
+    #print('persistance for', ql_file)
+    #p_data = persistince_source(ql_file)
+    data_copy = np.copy(data)
+    #data_mask[dq != 0] = 0
+    dq_mask(dq, data_copy)
+    weak_blob_mask(data_copy)
+    #persistince_masks(data, percist)
+    print('finding source')
+    threshold = detect_threshold(data_copy, snr=0.75)
+    sigma = 1.5 * gaussian_fwhm_to_sigma  # FWHM = 2.
+    kernel = Gaussian2DKernel(sigma, x_size=3, y_size=3)
+    #kernel.normalize()
+    segm = detect_sources(data_copy, threshold, npixels=4, filter_kernel=kernel)
+    print(segm)
+    seg = segm.data
+    seg[seg > 0] = 1.0
+    #seg = find_sources(data_mask)
+    print(f,'writing seg')
+    write_file(f, hdr1, seg, propid, 'seg.fits', filter)
+
+
 def raw_2_flt(ql_file):
     current = os.getcwd()
-    new_file = '/grp/hst/wfc3v/hkurtz/sky_flats/Feb24_20_input/' + ql_file[-18:-8] + 'raw.fits'
+    new_file = '/grp/hst/wfc3v/hkurtz/sky_flats/Mar4_noflat_no512_input/' + ql_file[-18:-8] + 'raw.fits'
     file_ql = ql_file[:-8] + 'raw.fits'
     copyfile(file_ql, new_file)
     print(new_file)
@@ -348,7 +378,7 @@ def raw_2_flt(ql_file):
         print('no asn')
     else:
         asn_ql = ql_file[:-18] + asn
-        asn_local = '/grp/hst/wfc3v/hkurtz/sky_flats/Feb24_20_input/' + asn
+        asn_local = '/grp/hst/wfc3v/hkurtz/sky_flats/Mar4_noflat_no512_input/' + asn
         if asn == "NONE":
             print("have to make ASN")
         if asn != "NONE":
@@ -367,24 +397,30 @@ def raw_2_flt(ql_file):
     #tv3_flat = flat_field(filt, filt_list, pflat_list)
     #hdr['PFLTFILE'] = tv3_flat
     hdulist.close()
-    print("start calwf3")
-    os.chdir(new_file[:-18])
-    calwf3(new_file[-18:])
-    os.chdir(current)
+    flt = new_file[:-8] + 'flt.fits'
+    ima = new_file[:-8] + 'ima.fits'
+    if os.path.isfile(flt):
+            os.remove(flt)
+    if os.path.isfile(ima):
+            os.remove(ima)
+    #print("start calwf3")
+    #os.chdir(new_file[:-18])
+    #calwf3(new_file[-18:])
+    #os.chdir(current)
+    #print('finished calwf3 if there is no file we have a porblem')
+
+
+def check_ff(ql_file, raw_f, lim = True):
+    #raw_2_flt(ql_file)
+    #current = os.getcwd()
+    #os.chdir(raw_f[:-18])
+    calwf3(raw_f[-18:])
+    #os.chdir(current)
     print('finished calwf3 if there is no file we have a porblem')
-
-
-def check_ff(ql_file):
-    current = os.getcwd()
-    cal_dir = '/grp/hst/wfc3v/hkurtz/sky_flats/Feb24_20_input/'
-    os.chdir(cal_dir)
-    print(os.getcwd())
-    raw_f = '/grp/hst/wfc3v/hkurtz/sky_flats/Feb24_20_input/' + ql_file[-18:-8] + 'raw.fits'
-    raw_2_flt(ql_file)
     f=raw_f[:-8]+'flt.fits'
     print(f)
-    logger.info(raw_f)
-    hdr1 = fits.getheader(raw_f, 0)
+    logger.info(f)
+    hdr1 = fits.getheader(f, 0)
     propid = hdr1['PROPOSID']
     calver = hdr1['CAL_VER']
     targ = hdr1['TARGNAME']
@@ -392,26 +428,17 @@ def check_ff(ql_file):
     filter = hdr1['FILTER']
     asn = hdr1['ASN_TAB']
     
+
     logger.info('[PROPOSID:, CAL_VER:, TARGNAME:] %s', [propid, calver, targ])
     logger.info('EXPTIME: %s', expt)
     logger.info('FILTER: %s', filter)
-    print('entering earth lim')
-    earth_lim_cor.e_lim_cor(raw_f)
-    #earth_header = fits.getheader(raw_f, 0)
+    if lim == True:
+        print('entering earth lim')
+        earth_lim_cor.e_lim_cor(raw_f)
     if filter in refilter:
         #raw_file=f[:-8]+'raw.fits'
-        #print(raw_file)
     #    print('entering cr_corr')
     #    print(raw_f)
-        #if asn == "NONE":
-        #    print("no ASN so cannnot use yet")
-        #else:
-        #    asn_local = '/grp/hst/wfc3v/hkurtz/sky_flats/test_h/input/' + asn
-        #    if os.path.isfile(asn_local):
-        #        print('true')
-        #_reprocess_raw_crcorr(raw_f)
-        #raw_hdu = fits.open(raw_f)
-        #asn_tab = raw_hdu[0].header['ASN_TAB']
         print('start asn')
         if asn == 'NONE': #make dummy asn table. remove this clause once calwf3 is patched
             new_asn_tab = np.rec.array([(os.path.basename(raw_f)[0:9],'EXP-DTH', 1)], formats = 'S14,S14,i1', names='MEMNAME,MEMTYPE,MEMPRSNT')
@@ -425,6 +452,7 @@ def check_ff(ql_file):
             hdu.close()
             print('write out asn')
             none_hdu_list.writeto(raw_f[:-8]+'asn.fits')
+
         elif asn in asn_bad: #make dummy asn table. remove this clause once calwf3 is patched
             new_asn_tab = np.rec.array([(os.path.basename(raw_f)[0:9],'EXP-DTH', 1)], formats = 'S14,S14,i1', names='MEMNAME,MEMTYPE,MEMPRSNT')
             hdu_1 = fits.BinTableHDU(new_asn_tab)
@@ -437,34 +465,24 @@ def check_ff(ql_file):
             hdu.close()
             print('write out asn')
             none_hdu_list.writeto(raw_f[:-8]+'asn.fits')
+
+        else:
+            asn_local = '/grp/hst/wfc3v/hkurtz/sky_flats/Mar4_noflat_no512_input/' + asn
+            if os.path.isfile(asn_local):
+                print('true')
         print('entering flattend ramp')
-        make_flattened_ramp_flt(raw_f[-18:])#stats_subregion = None, outfile = None,
+        make_flattened_ramp_flt(raw_f)#stats_subregion = None, outfile = None,
     #else:
         #continue
     #    print('filter_error')
-    #if "OLDEXPT" in hdr1:
-     #   old=hdr1['OLDEXPT']
-      #  diff=old-expt
-       # if diff < 1.0:
-    if propid in ff_list:
-        print(targ)
-        if "PAR" in targ:
-            print(propid, targ)
-            pipeline(f,propid,filter,ql_file)    
-        else:
-            print(f, "is a NOT a parallel observation")
-    elif propid not in ff_list:
-       pipeline(f,propid,filter,ql_file)
-        #else:
-         #   image = fits.getdata(f)
-          #  write_file(f, hdr1, image, propid, 'lim.fits', filter)
-    #else:
-     #   image = fits.getdata(f)
-      #  write_file(f, hdr1, image, propid, 'idk.fits', filter)
-       # print(f, "no elm cor")
-
-    os.chdir(current)
-    return
+#    if propid in ff_list:
+#        if "PAR" in targ:
+#            pipeline(f,propid,filter,ql_file)    
+#        else:
+#            print(f, "is a NOT a parallel observation")
+#    elif propid not in ff_list:
+#       pipeline(f,propid,filter,ql_file)
+#    return
 
 
 def pipeline(f,propid,filter,ql_file):
@@ -477,29 +495,33 @@ def pipeline(f,propid,filter,ql_file):
     print(f, hdr1['EXPTIME'])
     print('persistance for', ql_file)
     p_data = persistince_source(ql_file)
+    print('copy data')
     data_copy = np.copy(data)
     #data_mask[dq != 0] = 0
     dq_mask(dq, data_copy)
-    weak_blob_mask(data_copy)
-    #took out of funchtion with it work better?
-    threshold = detect_threshold(data_copy, snr=0.75)
-    sigma = 1.5 * gaussian_fwhm_to_sigma  # FWHM = 2.
-    kernel = Gaussian2DKernel(sigma, x_size=3, y_size=3)
-    #kernel.normalize()
-    segm = detect_sources(data_copy, threshold, npixels=4, filter_kernel=kernel)
-    print(segm)
-    seg = segm.data
-    seg[seg > 0] = 1.0
-    #eg = find_sources(data_mask) #end of function move to main
-    print(f,'writing seg')
-    write_file(f, hdr1, seg, propid, 'seg.fits', filter)
+    #weak_blob_mask(data_copy)
+    print('masked')
+    #read in segmentation map
+
+    spro=str(propid)
+    file_seg = '/grp/hst/wfc3v/hkurtz/sky_flats/Mar4_noflat_no512_run/' + filter + '/' + spro + '_' + f[-18:-8] + 'seg.fits'
+    print(file_seg)
+    seg = open_file(file_seg)
+    print(seg)
     dataC = convolve_data(seg)
+    write_file(f, hdr1, dataC, propid, 'con.fits', filter)
     im = mask_sources(dataC)
+    write_file(f, hdr1, im, propid, 'cim.fits', filter)
+    print('seg read in')
     dq_convolved_mask(dq, data, im)
-    weak_blob_mask_convolve(data)
+    write_file(f, hdr1, data, propid, 'dqm.fits', filter)
+    print('DQ masked')
+    print("per", p_data.shape, "data", data.shape)
     persistince_masks(data, p_data)
+    print('persistance mask')
     write_file(f, hdr1, data, propid, 'per.fits', filter)
     image, norm_mean = normalize_region(data)
+    print('file writed')
     write_file(f, hdr1, data, propid, 'norm.fits', filter)
     logger.info('Normalized to: %s', norm_mean)
     clipdata = sigclip(image)
@@ -522,26 +544,85 @@ def pipeline(f,propid,filter,ql_file):
 
 
     # continue
+    #else:
+    #    diff = earth_lim_check(image)
+    #    logger.info('Differance Mean-Median: %s', diff)
+    #    if abs(diff) > 1.0011:
+    #        logger.info('File has Earthlim. Not used.')
+    #        used = 'Earthlim'
+    #        if ~np.isnan(mean) & ~np.isnan(median) & ~np.isnan(norm_mean) & ~np.isnan(std) & ~np.isnan(per):
+    #            add_to_header(hdr1, norm_mean, mean, median, std, per, used)
+    #        print(f,'writing elm')
+    #        write_file(f, hdr1, image, propid, 'elm.fits', filter)
+    #    else:
+    #        used = 'yes'
+    #        if ~np.isnan(mean) & ~np.isnan(median) & ~np.isnan(norm_mean) & ~np.isnan(std) & ~np.isnan(per):
+    #            add_to_header(hdr1, norm_mean, mean, median, std, per, used)
+    #        print(f,'writing mdi')
+    #        print(f, hdr1['EXPTIME'])
+    #        write_file(f, hdr1, image, propid, 'mdi.fits', filter)
+    #        #data_array[i, :, :] = clipdata
+    #        logger.info('File Used.')
     else:
-        diff = earth_lim_check(image)
-        logger.info('Differance Mean-Median: %s', diff)
-        if abs(diff) > 1.0011:
-            logger.info('File has Earthlim. Not used.')
-            used = 'Earthlim'
-            if ~np.isnan(mean) & ~np.isnan(median) & ~np.isnan(norm_mean) & ~np.isnan(std) & ~np.isnan(per):
-                add_to_header(hdr1, norm_mean, mean, median, std, per, used)
-            print(f,'writing elm')
-            write_file(f, hdr1, image, propid, 'elm.fits', filter)
-        else:
-            used = 'yes'
-            if ~np.isnan(mean) & ~np.isnan(median) & ~np.isnan(norm_mean) & ~np.isnan(std) & ~np.isnan(per):
-                add_to_header(hdr1, norm_mean, mean, median, std, per, used)
-            print(f,'writing mdi')
-            print(f, hdr1['EXPTIME'])
-            write_file(f, hdr1, image, propid, 'mdi.fits', filter)
-            #data_array[i, :, :] = clipdata
-            logger.info('File Used.')
+        used = 'yes'
+        if ~np.isnan(mean) & ~np.isnan(median) & ~np.isnan(norm_mean) & ~np.isnan(std) & ~np.isnan(per):
+            add_to_header(hdr1, norm_mean, mean, median, std, per, used)
+        print(f,'writing mdi')
+        print(f, hdr1['EXPTIME'])
+        write_file(f, hdr1, image, propid, 'mdi.fits', filter)
+        #data_array[i, :, :] = clipdata
+        logger.info('File Used.')
     return ()
+
+
+def run2(ql_file):
+    raw_f = '/grp/hst/wfc3v/hkurtz/sky_flats/Mar4_noflat_no512_input/' + ql_file[-18:-8] + 'raw.fits'
+    current = os.getcwd()
+    os.chdir(raw_f[:-18])
+    raw_2_flt(ql_file)
+    check_ff(ql_file,raw_f)
+    f=raw_f[:-8]+'flt.fits'
+    hdr1 = fits.getheader(f, 0)
+    propid = hdr1['PROPOSID']
+    filter = hdr1['FILTER']
+    targ = hdr1['TARGNAME']
+    segment_pipeline(f,propid,filter,ql_file)
+    #change flat
+    hdu = fits.open(raw_f, mode='update')
+    hdr = hdu[0].header
+    hdr['FLATCORR'] = 'OMIT'
+    hdu.close()
+    #remove all flts and imas
+    first_flts = '/grp/hst/wfc3v/hkurtz/sky_flats/Mar4_noflat_no512_input/' + ql_file[-18:-8] + 'flt.fits'
+    first_imaflts = '/grp/hst/wfc3v/hkurtz/sky_flats/Mar4_noflat_no512_input/flattened_' + ql_file[-18:-8] + 'ima_flt.fits'
+    first_imaimas = '/grp/hst/wfc3v/hkurtz/sky_flats/Mar4_noflat_no512_input/flattened_' + ql_file[-18:-8] + 'ima_ima.fits'    
+    first_imas ='/grp/hst/wfc3v/hkurtz/sky_flats/Mar4_noflat_no512_input/' + ql_file[-18:-8] + 'ima.fits'
+    existing_files = glob.glob(first_flts)
+    existing_files.append(first_imas)
+    existing_files.append(first_imaflts)
+    existing_files.append(first_imaimas)
+
+    print(existing_files)
+    for file in existing_files:
+        if os.path.isfile(file):
+            os.remove(file)
+            print('removed', file)
+
+    print('running second time')
+    check_ff(ql_file,raw_f,lim=False)
+    if propid in ff_list:
+        if "PAR" in targ:
+            pipeline(f,propid,filter,ql_file)    
+        else:
+            print(f, "is a NOT a parallel observation")
+    elif propid not in ff_list:
+       pipeline(f,propid,filter,ql_file)
+    os.chdir(current)
+
+
+
+
+
 
 
 # move if statments as conditionals
@@ -560,7 +641,7 @@ def main():
 
     logger.info('The pipeline is starting')
 
-    #pro_list = ['13831','12460']#,'13667','14327','15118','11166']#,'11101','11202','11208','11343','11557','11597','11600','11644',
+    #pro_list = ['13000','14262','13667','14327','15118','11166','11101','11202','11208','11343','11557','11597','11600','11644',
     #            '11650','11666','11669','11838','11624','12051','11709','11738','12177','12194','12247','12265','12471','12487',
     #            '12496','12886','12942','12949','12990']
 
@@ -594,29 +675,24 @@ def main():
     print(len(all_files))
     for f in all_files:
         #print(f)
-        #hdr = fits.getheader(f, 0)
-        #filt = hdr['FILTER']
         if f in key_bad:
             print(f,'bad_key')
-        #elif filt == 'F105W':
-         #   list_files.append(f)
-        #elif filt == 'F140W':
-         #   list_files.append(f)
         else:
             list_files.append(f)
-            #print('skiped')
-    #    hdr = fits.getheader(f, 0)
-    #    filt = hdr['FILTER']
-    #    if filt == 'F105W':
-    #        #new_file = '/grp/hst/wfc3v/hkurtz/sky_flats/el_105_input/' + f[-18:]
-    #        list_files.append(f)
-    #    elif filt == 'F140W':
-    #        #new_file = '/grp/hst/wfc3v/hkurtz/sky_flats/el_105_input/' + f[-18:]
-    #        list_files.append(f)
+        #    hdr = fits.getheader(f, 0)
+        #    filt = hdr['FILTER']
+        #    if filt == 'F105W':
+        #        #new_file = '/grp/hst/wfc3v/hkurtz/sky_flats/el_105_input/' + f[-18:]
+        #        list_files.append(f)
+        #    elif filt == 'F140W':
+        #        #new_file = '/grp/hst/wfc3v/hkurtz/sky_flats/el_105_input/' + f[-18:]
+        #        list_files.append(f)
+        #    else:
+        #        continue
     print(len(list_files))
 
     p = Pool(30)
-    result = p.map(check_ff, list_files)
+    result = p.map(run2, list_files)
     print(result)
 
 
